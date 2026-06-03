@@ -56,9 +56,9 @@ if archivo_carga:
             st.error(f"❌ La columna Esperadas '{col_expected}' no se encuentra.")
         else:
             # --- LIMPIEZA DE TEXTOS CRÍTICA ---
-            # Asegura que las columnas de agrupación no tengan espacios fantasmas
             df[sku_col] = df[sku_col].astype(str).str.strip()
-            if pos_col in df.columns:
+            tiene_pos = pos_col in df.columns
+            if tiene_pos:
                 df[pos_col] = df[pos_col].astype(str).str.strip().str.upper()
             
             # Limpieza y conversión a números
@@ -78,6 +78,56 @@ if archivo_carga:
             df['Diferencia_Uds'] = df['Total_Real_Leido'] - df[col_expected]
             df['Desviacion_Absoluta'] = df['Diferencia_Uds'].abs()
             
+            # --- CÁLCULO PREVIO DE PATRONES PARA PORCENTAJES ---
+            total_uds_reubicadas = 0
+            total_uds_cruces_talla = 0
+            
+            if tiene_pos:
+                # 1. Calcular volumen de reubicados
+                faltas = df[df['Diferencia_Uds'] < 0].copy()
+                sobras = df[df['Diferencia_Uds'] > 0].copy()
+                skus_procesados = set()
+                
+                for _, f in faltas.iterrows():
+                    sku = f[sku_col]
+                    if sku not in skus_procesados:
+                        f_sku_total = abs(faltas[faltas[sku_col] == sku]['Diferencia_Uds'].sum())
+                        s_sku_total = sobras[sobras[sku_col] == sku]['Diferencia_Uds'].sum()
+                        total_uds_reubicadas += min(f_sku_total, s_sku_total)
+                        skus_procesados.add(sku)
+                
+                # 2. Calcular volumen de cruces de talla
+                def extraer_raiz_definitiva(sku):
+                    sku_str = str(sku).strip()
+                    partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
+                    if len(partes) > 1:
+                        return partes[0].strip().upper()
+                    return sku_str.upper()
+
+                df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz_definitiva)
+                
+                for (pos, raiz), g in df.groupby([pos_col, 'Raiz_Modelo']):
+                    lineas_descuadre = g[g['Diferencia_Uds'] != 0]
+                    if len(lineas_descuadre) > 1:
+                        t_faltas = abs(lineas_descuadre[lineas_descuadre['Diferencia_Uds'] < 0]['Diferencia_Uds'].sum())
+                        t_sobras = lineas_descuadre[lineas_descuadre['Diferencia_Uds'] > 0]['Diferencia_Uds'].sum()
+                        if t_faltas > 0 and t_sobras > 0:
+                            total_uds_cruces_talla += min(t_faltas, t_sobras)
+
+            # Volúmenes absolutos de desviaciones totales
+            total_desviacion_absoluta = df['Desviacion_Absoluta'].sum()
+            
+            # Ajustar para que la suma de errores detectados no supere el movimiento absoluto teórico
+            uds_descuadre_puro = max(0, total_desviacion_absoluta - (total_uds_reubicadas * 2) - (total_uds_cruces_talla * 2))
+            
+            # Cálculo de porcentajes reales representativos sobre el impacto total
+            if total_desviacion_absoluta > 0:
+                pct_reubicados = ((total_uds_reubicadas * 2) / total_desviacion_absoluta) * 100
+                pct_tallas = ((total_uds_cruces_talla * 2) / total_desviacion_absoluta) * 100
+                pct_puro = (uds_descuadre_puro / total_desviacion_absoluta) * 100
+            else:
+                pct_reubicados, pct_tallas, pct_puro = 0.0, 0.0, 0.0
+
             # --- SECCIÓN 1: MÉTRICAS CLAVE ---
             st.write("---")
             st.subheader("📌 Resumen Ejecutivo de Descuadres")
@@ -89,6 +139,13 @@ if archivo_carga:
             
             descuadre_neto = int(df['Diferencia_Uds'].sum())
             m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
+            
+            # --- NUEVA SUBSECCIÓN: DISTRIBUCIÓN PORCENTUAL DEL ERROR ---
+            st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
+            p1, p2, p3 = st.columns(3)
+            p1.metric("🔄 Peso de Mercancía Reubicada", f"{pct_reubicados:.1f}%", help="Porcentaje de stock que simplemente está guardado en un hueco incorrecto.")
+            p2.metric("🏷️ Peso de Cruces de Talla", f"{pct_tallas:.1f}%", help="Porcentaje de error causado por cambios de variante/talla del mismo modelo en la misma posición.")
+            p3.metric("🚨 Peso de Descuadre Real Neto", f"{pct_puro:.1f}%", help="Porcentaje de error crítico que falta o sobra de forma absoluta (fuga o exceso real).")
             
             # --- SECCIÓN 2: GRÁFICOS DE DESVIACIONES ---
             st.write("---")
@@ -106,7 +163,7 @@ if archivo_carga:
                 st.plotly_chart(fig_sku, use_container_width=True)
                 
             with col_g2:
-                if pos_col in df.columns:
+                if tiene_pos:
                     st.markdown("### Top 10 Ubicaciones más Críticas")
                     df_pos = df.groupby(pos_col)[['Diferencia_Uds', 'Desviacion_Absoluta']].sum().reset_index()
                     top_pos = df_pos.sort_values(by='Desviacion_Absoluta', ascending=False).head(10)
@@ -123,15 +180,11 @@ if archivo_carga:
             st.subheader("🧠 Diagnósticos Automáticos de Operaciones (Detección de Patrones)")
             col_a, col_b = st.columns(2)
             
-            tiene_pos = pos_col in df.columns
-            
             with col_a:
                 st.markdown("### 🔄 Mercancía Reubicada (Mismo artículo en huecos distintos)")
                 if tiene_pos:
-                    faltas = df[df['Diferencia_Uds'] < 0]
-                    sobras = df[df['Diferencia_Uds'] > 0]
                     reubicaciones = []
-                    
+                    skus_vistos = set()
                     for _, f in faltas.iterrows():
                         match = sobras[(sobras[sku_col] == f[sku_col]) & (sobras['Diferencia_Uds'] == abs(f['Diferencia_Uds']))]
                         for _, s in match.iterrows():
@@ -152,27 +205,12 @@ if archivo_carga:
                 st.markdown("### 🏷️ Análisis de Cruces de Talla (Compensación Proporcional)")
                 if tiene_pos:
                     cruces_talla = []
-                    
-                    # Identificación flexible de raíz del modelo (corta por el último -, _ o /)
-                    def extraer_raiz_definitiva(sku):
-                        sku_str = str(sku).strip()
-                        partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
-                        if len(partes) > 1:
-                            return partes[0].strip().upper()
-                        return sku_str.upper()
-
-                    df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz_definitiva)
-                    
-                    # Analizar por ubicación y modelo base
                     for (pos, raiz), g in df.groupby([pos_col, 'Raiz_Modelo']):
-                        # Filtrar líneas con descuadres reales dentro de este grupo
                         lineas_descuadre = g[g['Diferencia_Uds'] != 0]
-                        
                         if len(lineas_descuadre) > 1:
                             total_faltas = abs(lineas_descuadre[lineas_descuadre['Diferencia_Uds'] < 0]['Diferencia_Uds'].sum())
                             total_sobras = lineas_descuadre[lineas_descuadre['Diferencia_Uds'] > 0]['Diferencia_Uds'].sum()
                             
-                            # Si en la misma ubicación coexisten faltas y sobras del mismo modelo base
                             if total_faltas > 0 and total_sobras > 0:
                                 unidades_compensadas = int(min(total_faltas, total_sobras))
                                 resto_neto = int(total_sobras - total_faltas)
