@@ -79,8 +79,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Llama a la imagen "logo.png" que acabas de subir a GitHub para colocarla en la cabecera lateral
-st.sidebar.image("logo.png", width=160)
+# URL remota del logo - Solución al error de carga local
+URL_LOGO_CORPORATIVO = "https://cdn.brandfetch.io/idBNTSMPCj/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1752693425078"
+st.sidebar.image(URL_LOGO_CORPORATIVO, width=160)
 
 st.title("📊 Cuadro de Mando: Comparativa de Unidades (Lógica de Recuento)")
 st.markdown("Sube tu reporte de inventario. El sistema consolidará el Paso 1 y Paso 2 aplicando la regla de auditoría de Logisfashion.")
