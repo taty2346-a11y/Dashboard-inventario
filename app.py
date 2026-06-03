@@ -4,7 +4,7 @@ import streamlit as st
 
 # Configuración básica e imagen corporativa
 st.set_page_config(page_title="Auditoría Logisfashion", page_icon="📊", layout="wide")
-st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png", width=200)
+st.sidebar.image("https://media.licdn.com/dms/image/v2/C560BAQG7phmNHnJQJw/company-logo_200_200/company-logo_200_200/0/1631389188096?e=2147483647&v=beta&t=nMttWFJZOI08O4hFTEzFKElb8AOGTrOgKbj8jb4g3kM", width=200)
 
 st.title("📊 Control de Diferencias de Inventario")
 st.markdown("Sube los reportes del sistema y del conteo físico para generar el análisis de descuadres.")
