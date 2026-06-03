@@ -7,35 +7,34 @@ import re
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
 st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png", width=200)
 
-st.title("📊 Cuadro de Mando: Comparativa de Unidades (Lógica de Recuento)")
-# --- INICIO DEL MODO IMPRESIÓN (PDF LIMPIO) ---
-estilo_impresion = """
+# --- CONFIGURACIÓN INVISIBLE PARA EL MODO IMPRESIÓN (PDF CLEAN) ---
+st.markdown("""
 <style>
 @media print {
-    /* Ocultar la barra lateral de configuración */
+    /* Ocultar por completo la barra lateral de configuración en el PDF */
     section[data-testid="stSidebar"] {
         display: none !important;
     }
-    /* Ocultar el menú de arriba a la derecha de Streamlit */
-    header {
+    /* Ocultar las cabeceras superiores de la web de Streamlit */
+    header, footer {
         display: none !important;
     }
-    /* Ajustar los márgenes para que ocupe todo el ancho del PDF */
+    /* Ajustar los contenidos para que aprovechen el 100% del folio */
     .block-container {
         max-width: 100% !important;
         padding-top: 1rem !important;
-        margin-top: 0 !important;
+        padding-bottom: 1rem !important;
     }
-    /* Forzar al navegador a imprimir los colores de fondo de las tarjetitas */
+    /* Obligar al navegador a mantener los colores de los gráficos y tarjetas */
     * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
 }
 </style>
-"""
-st.markdown(estilo_impresion, unsafe_allow_html=True)
-# --- FIN DEL MODO IMPRESIÓN ---
+""", unsafe_allow_html=True)
+
+st.title("📊 Cuadro de Mando: Comparativa de Unidades (Lógica de Recuento)")
 st.markdown("Sube tu reporte de inventario. El sistema consolidará el Paso 1 y Paso 2 aplicando la regla de auditoría de Logisfashion.")
 
 # Subida del único fichero
@@ -111,7 +110,6 @@ if archivo_carga:
             total_uds_cruces_talla = 0
             
             if tiene_pos:
-                # 1. Calcular volumen de reubicados
                 faltas = df[df['Diferencia_Uds'] < 0].copy()
                 sobras = df[df['Diferencia_Uds'] > 0].copy()
                 skus_procesados = set()
@@ -124,7 +122,6 @@ if archivo_carga:
                         total_uds_reubicadas += min(f_sku_total, s_sku_total)
                         skus_procesados.add(sku)
                 
-                # 2. Calcular volumen de cruces de talla
                 def extraer_raiz_definitiva(sku):
                     sku_str = str(sku).strip()
                     partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
@@ -142,13 +139,9 @@ if archivo_carga:
                         if t_faltas > 0 and t_sobras > 0:
                             total_uds_cruces_talla += min(t_faltas, t_sobras)
 
-            # Volúmenes absolutos de desviaciones totales
             total_desviacion_absoluta = df['Desviacion_Absoluta'].sum()
-            
-            # Ajustar para que la suma de errores detectados no supere el movimiento absoluto teórico
             uds_descuadre_puro = max(0, total_desviacion_absoluta - (total_uds_reubicadas * 2) - (total_uds_cruces_talla * 2))
             
-            # Cálculo de porcentajes reales representativos sobre el impacto total
             if total_desviacion_absoluta > 0:
                 pct_reubicados = ((total_uds_reubicadas * 2) / total_desviacion_absoluta) * 100
                 pct_tallas = ((total_uds_cruces_talla * 2) / total_desviacion_absoluta) * 100
@@ -168,12 +161,11 @@ if archivo_carga:
             descuadre_neto = int(df['Diferencia_Uds'].sum())
             m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
             
-            # --- NUEVA SUBSECCIÓN: DISTRIBUCIÓN PORCENTUAL DEL ERROR ---
             st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
             p1, p2, p3 = st.columns(3)
-            p1.metric("🔄 Peso de Mercancía Reubicada", f"{pct_reubicados:.1f}%", help="Porcentaje de stock que simplemente está guardado en un hueco incorrecto.")
-            p2.metric("🏷️ Peso de Cruces de Talla", f"{pct_tallas:.1f}%", help="Porcentaje de error causado por cambios de variante/talla del mismo modelo en la misma posición.")
-            p3.metric("🚨 Peso de Descuadre Real Neto", f"{pct_puro:.1f}%", help="Porcentaje de error crítico que falta o sobra de forma absoluta (fuga o exceso real).")
+            p1.metric("🔄 Peso de Mercancía Reubicada", f"{pct_reubicados:.1f}%")
+            p2.metric("🏷️ Peso de Cruces de Talla", f"{pct_tallas:.1f}%")
+            p3.metric("🚨 Peso de Descuadre Real Neto", f"{pct_puro:.1f}%")
             
             # --- SECCIÓN 2: GRÁFICOS DE DESVIACIONES ---
             st.write("---")
@@ -212,7 +204,6 @@ if archivo_carga:
                 st.markdown("### 🔄 Mercancía Reubicada (Mismo artículo en huecos distintos)")
                 if tiene_pos:
                     reubicaciones = []
-                    skus_vistos = set()
                     for _, f in faltas.iterrows():
                         match = sobras[(sobras[sku_col] == f[sku_col]) & (sobras['Diferencia_Uds'] == abs(f['Diferencia_Uds']))]
                         for _, s in match.iterrows():
