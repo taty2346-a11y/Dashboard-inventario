@@ -5,7 +5,7 @@ import re
 
 # Configuración básica e imagen corporativa
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
-st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png", width=200)
+st.sidebar.image("https://cdn.brandfetch.io/idBNTSMPCj/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1752693425078", width=200)
 
 st.title("📊 Cuadro de Mando: Comparativa de Unidades (Mismo Fichero)")
 st.markdown("Sube tu reporte de inventario para analizar las diferencias directamente entre las columnas de unidades.")
