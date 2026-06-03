@@ -5,7 +5,7 @@ import re
 
 # Configuración básica e imagen corporativa
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
-st.sidebar.image("https://cdn.brandfetch.io/idBNTSMPCj/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1752693425078", width=200)
+st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png", width=200)
 
 st.title("📊 Cuadro de Mando: Comparativa de Unidades (Mismo Fichero)")
 st.markdown("Sube tu reporte de inventario para analizar las diferencias directamente entre las columnas de unidades.")
@@ -107,7 +107,6 @@ if archivo_carga:
                     reubicaciones = []
                     
                     for _, f in faltas.iterrows():
-                        # Buscar si el mismo SKU tiene un sobrante idéntico en otra ubicación
                         match = sobras[(sobras[sku_col] == f[sku_col]) & (sobras['Diferencia_Uds'] == abs(f['Diferencia_Uds']))]
                         for _, s in match.iterrows():
                             reubicaciones.append({
@@ -124,23 +123,27 @@ if archivo_carga:
                     st.warning("⚠️ Se necesita una columna de ubicación válida para calcular traspasos.")
                     
             with col_b:
-                st.markdown("### 🏷️ Posibles Cruces de Talla o Variante (Letras o Números)")
+                st.markdown("### 🏷️ Posibles Cruces de Talla o Variante (Cualquier Formato)")
                 if tiene_pos:
                     cruces_talla = []
                     
-                    # Función inteligente para extraer la raíz del artículo (elimina sufijos de talla comunes como -M, _42, -XL, etc.)
-                    def extraer_raiz(sku):
-                        text = str(sku)
-                        # Busca guiones o barras bajas seguidos de letras o números al final (ej: -XL, _42, -S, -38)
-                        raiz = re.sub(r'[-_]([A-Za-z]+|\d+)$', '', text)
-                        return raiz
+                    # NUEVA LÓGICA ULTRA-FLEXIBLE:
+                    # Busca el último separador (-, _, /) y se queda con lo de antes. 
+                    # Si no tiene separador, usa el SKU completo.
+                    def extraer_raiz_definitiva(sku):
+                        sku_str = str(sku).strip()
+                        # Divide usando el último guion o barra baja que encuentre
+                        partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
+                        if len(partes) > 1:
+                            return partes[0] # Retorna la raíz antes del último separador
+                        return sku_str
 
-                    df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz)
+                    df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz_definitiva)
                     
                     # Agrupar por ubicación y por el modelo base
                     for (pos, raiz), g in df.groupby([pos_col, 'Raiz_Modelo']):
-                        # Si en una misma ubicación hay más de una variante, el neto es 0 pero hay descuadres individuales
-                        if len(g) > 1 and g['Diferencia_Uds'].sum() == 0 and (g['Diferencia_Uds'] != 0).any():
+                        # Si en una misma ubicación el neto de diferencias da 0, pero hay descuadres individuales internos
+                        if len(g) > 1 and int(g['Diferencia_Uds'].sum()) == 0 and (g['Diferencia_Uds'] != 0).any():
                             detalles = ", ".join([f"{row[sku_col]}: {int(row['Diferencia_Uds'])}" for _, row in g.iterrows() if row['Diferencia_Uds'] != 0])
                             cruces_talla.append({
                                 "Ubicación": pos,
