@@ -55,6 +55,12 @@ if archivo_carga:
         elif col_expected not in df.columns:
             st.error(f"❌ La columna Esperadas '{col_expected}' no se encuentra.")
         else:
+            # --- LIMPIEZA DE TEXTOS CRÍTICA ---
+            # Asegura que las columnas de agrupación no tengan espacios fantasmas
+            df[sku_col] = df[sku_col].astype(str).str.strip()
+            if pos_col in df.columns:
+                df[pos_col] = df[pos_col].astype(str).str.strip().str.upper()
+            
             # Limpieza y conversión a números
             df[col_expected] = pd.to_numeric(df[col_expected], errors='coerce').fillna(0)
             df['Paso1_Num'] = pd.to_numeric(df[col_read_1], errors='coerce').fillna(0)
@@ -152,8 +158,8 @@ if archivo_carga:
                         sku_str = str(sku).strip()
                         partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
                         if len(partes) > 1:
-                            return partes[0]
-                        return sku_str
+                            return partes[0].strip().upper()
+                        return sku_str.upper()
 
                     df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz_definitiva)
                     
@@ -164,4 +170,49 @@ if archivo_carga:
                         
                         if len(lineas_descuadre) > 1:
                             total_faltas = abs(lineas_descuadre[lineas_descuadre['Diferencia_Uds'] < 0]['Diferencia_Uds'].sum())
-                            total_sobras = lineas_descuadre
+                            total_sobras = lineas_descuadre[lineas_descuadre['Diferencia_Uds'] > 0]['Diferencia_Uds'].sum()
+                            
+                            # Si en la misma ubicación coexisten faltas y sobras del mismo modelo base
+                            if total_faltas > 0 and total_sobras > 0:
+                                unidades_compensadas = int(min(total_faltas, total_sobras))
+                                resto_neto = int(total_sobras - total_faltas)
+                                
+                                if resto_neto > 0:
+                                    balance_final = f"Sobra el resto (+{resto_neto} Uds)"
+                                elif resto_neto < 0:
+                                    balance_final = f"Falta el resto ({resto_neto} Uds)"
+                                else:
+                                    balance_final = "Compensación Perfecta (Neto 0)"
+                                    
+                                detalles = ", ".join([f"{row[sku_col]}: {int(row['Diferencia_Uds'])}" for _, row in lineas_descuadre.iterrows()])
+                                
+                                cruces_talla.append({
+                                    "Ubicación": pos,
+                                    "Modelo Base": raiz,
+                                    "Uds Cruzadas": unidades_compensadas,
+                                    "Balance Restante": balance_final,
+                                    "Desglose Detallado": detalles
+                                })
+                                
+                    if cruces_talla:
+                        st.dataframe(pd.DataFrame(cruces_talla), use_container_width=True)
+                    else:
+                        st.info("No se detectaron errores de variantes o tallas mezcladas en los mismos huecos.")
+                else:
+                    st.warning("⚠️ Se necesita una columna de ubicación válida para calcular cruces de variantes.")
+            
+            # --- SECCIÓN 4: TABLA DE DATOS DETALLADA ---
+            st.write("---")
+            st.subheader("📋 Detalle de la Comparación Realizada")
+            
+            cols_prioritarias = [sku_col]
+            if tiene_pos: cols_prioritarias.append(pos_col)
+            cols_prioritarias += [col_expected, col_read_1, col_read_2, 'Total_Real_Leido', 'Diferencia_Uds']
+            
+            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c not in ['Desviacion_Absoluta', 'Raiz_Modelo', 'Paso1_Num', 'Paso2_Num']]
+            df_final = df[cols_prioritarias + resto_columnas]
+            
+            st.dataframe(df_final, use_container_width=True)
+            
+            csv = df_final.to_csv(index=False).encode('utf-8')
+            st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_consolidada.csv", mime="text/csv")
