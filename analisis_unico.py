@@ -7,25 +7,36 @@ import re
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
 st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png", width=200)
 
-# --- CONFIGURACIÓN INVISIBLE PARA EL MODO IMPRESIÓN (PDF CLEAN) ---
+# --- CONFIGURACIÓN PARA EVITAR QUE EL PDF SE CORTE (MODO MULTIPÁGINA INVISIBLE) ---
 st.markdown("""
 <style>
 @media print {
+    /* FUERZA AL NAVEGADOR A ROMPER EL SCROLL INTERNO Y IMPRIMIR TODO EL INFORME COMPLETO */
+    html, body, .stApp, .main, .block-container, [data-testid="stAppViewContainer"] {
+        overflow: visible !important;
+        height: auto !important;
+        position: static !important;
+    }
+    
     /* Ocultar por completo la barra lateral de configuración en el PDF */
     section[data-testid="stSidebar"] {
         display: none !important;
     }
-    /* Ocultar las cabeceras superiores de la web de Streamlit */
-    header, footer {
+    
+    /* Ocultar las cabeceras y menús superiores de Streamlit */
+    header, footer, [data-testid="stHeader"] {
         display: none !important;
     }
-    /* Ajustar los contenidos para que aprovechen el 100% del folio */
+    
+    /* Ajustar los contenidos para que aprovechen el 100% del ancho del folio */
     .block-container {
         max-width: 100% !important;
-        padding-top: 1rem !important;
-        padding-bottom: 1rem !important;
+        padding-top: 0rem !important;
+        padding-bottom: 0rem !important;
+        margin: 0 !important;
     }
-    /* Obligar al navegador a mantener los colores de los gráficos y tarjetas */
+    
+    /* Obligar al navegador a mantener los colores de los gráficos, KPIs y tarjetas */
     * {
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
@@ -260,7 +271,7 @@ if archivo_carga:
             
             # --- SECCIÓN 4: TABLA DE DATOS DETALLADA ---
             st.write("---")
-            st.subheader("📋 Detalle de la Comparación Realizada")
+            st.subheader("📋 Detalle de la Compartación Realizada")
             
             cols_prioritarias = [sku_col]
             if tiene_pos: cols_prioritarias.append(pos_col)
