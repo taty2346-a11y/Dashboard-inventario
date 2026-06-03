@@ -12,9 +12,9 @@ st.markdown("Sube los reportes del sistema y del conteo físico para generar el 
 # Subida de ficheros
 col1, col2 = st.columns(2)
 with col1:
-    file_sis = st.file_uploader("1. Cargar Stock en Sistema (Excel/CSV)", type=["xlsx", "csv"])
+    file_sis = st.file_uploader("1. Cargar Stock cliente (Excel/CSV)", type=["xlsx", "csv"])
 with col2:
-    file_fis = st.file_uploader("2. Cargar Conteo Físico (Excel/CSV)", type=["xlsx", "csv"])
+    file_fis = st.file_uploader("2. Cargar Conteo Logisfashion (Excel/CSV)", type=["xlsx", "csv"])
 
 if file_sis and file_fis:
     df_sis = pd.read_excel(file_sis) if file_sis.name.endswith(".xlsx") else pd.read_csv(file_sis)
