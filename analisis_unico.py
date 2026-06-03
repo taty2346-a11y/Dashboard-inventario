@@ -20,16 +20,39 @@ st.markdown("""
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    /* Personalización del botón de ejecutar con el azul turquesa corporativo */
+   # Configuración básica
+st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
+
+# --- ESTILOS: FONDO BLANCO, CABECERAS AZUL MARINO Y BOTÓN/DETALLES TURQUESA ---
+st.markdown("""
+<style>
+    /* Fondo general limpio */
+    .stApp { background-color: #ffffff !important; }
+    
+    /* Textos y títulos */
+    h1, h2, h3 { color: #002e5d !important; font-family: 'Segoe UI', sans-serif; }
+    
+    /* Tarjetas de métricas (borde turquesa suave) */
+    div[data-testid="stMetric"] {
+        background-color: #f9fbfb !important;
+        border: 1px solid #00818a !important;
+        border-radius: 10px !important;
+        padding: 15px !important;
+    }
+    
+    /* Botón de ejecutar (El color que te gusta) */
     div.stButton > button:first-child {
-        background-color: #002e5d !important;
+        background-color: #00818a !important;
         color: white !important;
         border-radius: 8px !important;
         border: none !important;
         font-weight: bold !important;
-        padding: 0.5rem 2rem !important;
-        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
     }
+    
+    /* Estilo de tablas y otros */
+    .stDataFrame { border: 1px solid #e0e0e0 !important; }
+</style>
+""", unsafe_allow_html=True)
     
     div.stButton > button:first-child:hover {
         background-color: #00818a !important;
