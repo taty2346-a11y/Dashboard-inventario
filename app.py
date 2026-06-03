@@ -25,8 +25,8 @@ if file_sis and file_fis:
     st.info(f"🔍 **Columnas en Físico:** {', '.join(df_fis.columns.tolist())}")
 
     st.sidebar.header("⚙️ Configuración de Columnas")
-    sku_col = st.sidebar.text_input("Columna de Código SKU", df_sis.columns[0])
-    unit_col = st.sidebar.text_input("Columna de Unidades Totales", df_sis.columns[1] if len(df_sis.columns) > 1 else "Unidades")
+    sku_col = st.sidebar.text_input("Columna de Código Sku", df_sis.columns[0])
+    unit_col = st.sidebar.text_input("Columna de Unidades totales", df_sis.columns[1] if len(df_sis.columns) > 1 else "Unidades")
     pos_col = st.sidebar.text_input("Columna de Ubicación/Posición", "Posicion")
 
     if st.sidebar.button("🚀 Ejecutar Análisis Completo"):
