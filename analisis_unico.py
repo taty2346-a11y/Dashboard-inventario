@@ -60,9 +60,7 @@ if archivo_carga:
             df['Paso1_Num'] = pd.to_numeric(df[col_read_1], errors='coerce').fillna(0)
             df['Paso2_Num'] = pd.to_numeric(df[col_read_2], errors='coerce').fillna(0)
             
-            # APLICACIÓN DE LA REGLA LOGÍSTICA:
-            # Si el Paso 2 se rellenó (es mayor que 0), se toma el Paso 2 como conteo final.
-            # Si el Paso 2 está a 0 o vacío, significa que el Paso 1 era correcto.
+            # REGLA LOGÍSTICA DE RECUENTO REPASADO
             def calcular_total_leido(row):
                 if row['Paso2_Num'] > 0:
                     return row['Paso2_Num']
@@ -70,7 +68,7 @@ if archivo_carga:
             
             df['Total_Real_Leido'] = df.apply(calcular_total_leido, axis=1)
             
-            # Calcular las diferencias matemáticas reales basadas en el consolidado (Leído - Esperado)
+            # Calcular diferencias reales
             df['Diferencia_Uds'] = df['Total_Real_Leido'] - df[col_expected]
             df['Desviacion_Absoluta'] = df['Diferencia_Uds'].abs()
             
@@ -145,11 +143,11 @@ if archivo_carga:
                     st.warning("⚠️ Se necesita una ubicación válida para calcular traspasos.")
                     
             with col_b:
-                st.markdown("### 🏷️ Posibles Cruces de Talla o Variante (Tallas Complejas)")
+                st.markdown("### 🏷️ Análisis de Cruces de Talla (Compensación Proporcional)")
                 if tiene_pos:
                     cruces_talla = []
                     
-                    # Identifica el modelo base eliminando el último guion/barra con número o letra (ej: -18, -22, -M)
+                    # Identificación flexible de raíz del modelo (corta por el último -, _ o /)
                     def extraer_raiz_definitiva(sku):
                         sku_str = str(sku).strip()
                         partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
@@ -159,33 +157,11 @@ if archivo_carga:
 
                     df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz_definitiva)
                     
+                    # Analizar por ubicación y modelo base
                     for (pos, raiz), g in df.groupby([pos_col, 'Raiz_Modelo']):
-                        if len(g) > 1 and int(g['Diferencia_Uds'].sum()) == 0 and (g['Diferencia_Uds'] != 0).any():
-                            detalles = ", ".join([f"{row[sku_col]}: {int(row['Diferencia_Uds'])}" for _, row in g.iterrows() if row['Diferencia_Uds'] != 0])
-                            cruces_talla.append({
-                                "Ubicación": pos,
-                                "Modelo Base": raiz,
-                                "Descuadre Interno de Variantes": detalles
-                            })
-                    if cruces_talla:
-                        st.dataframe(pd.DataFrame(cruces_talla), use_container_width=True)
-                    else:
-                        st.info("No se detectaron errores de tallas cruzadas en el mismo hueco.")
-                else:
-                    st.warning("⚠️ Se necesita una columna de ubicación válida para calcular cruces de variantes.")
-            
-            # --- SECCIÓN 4: TABLA DE DATOS DETALLADA ---
-            st.write("---")
-            st.subheader("📋 Detalle de la Comparación Realizada")
-            
-            cols_prioritarias = [sku_col]
-            if tiene_pos: cols_prioritarias.append(pos_col)
-            cols_prioritarias += [col_expected, col_read_1, col_read_2, 'Total_Real_Leido', 'Diferencia_Uds']
-            
-            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c not in ['Desviacion_Absoluta', 'Raiz_Modelo', 'Paso1_Num', 'Paso2_Num']]
-            df_final = df[cols_prioritarias + resto_columnas]
-            
-            st.dataframe(df_final, use_container_width=True)
-            
-            csv = df_final.to_csv(index=False).encode('utf-8')
-            st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_consolidada.csv", mime="text/csv")
+                        # Filtrar líneas con descuadres reales dentro de este grupo
+                        lineas_descuadre = g[g['Diferencia_Uds'] != 0]
+                        
+                        if len(lineas_descuadre) > 1:
+                            total_faltas = abs(lineas_descuadre[lineas_descuadre['Diferencia_Uds'] < 0]['Diferencia_Uds'].sum())
+                            total_sobras = lineas_descuadre
