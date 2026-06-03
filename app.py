@@ -6,6 +6,7 @@ import streamlit as st
 st.set_page_config(
     page_title="Control de Inventario Inteligente", page_icon="📊", layout="wide"
 )
+st.sidebar.image("https://website-assets-fs.freshworks.com/attachments/cjyh5btzx00954kfz5wibfo9s-logisfashion-logo.one-half.png", width=200)
 
 st.title("📊 Cuadro de Mando: Control de Diferencias de Inventario")
 st.markdown(
