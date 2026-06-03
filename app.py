@@ -8,9 +8,9 @@ st.set_page_config(
 )
 
 # Insertar logotipo oficial de Logisfashion
-st.sidebar.image(
-    "https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png",
+st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png",
     width=200,
+                )
     # Mostrar las columnas reales detectadas para ayudar al usuario
     st.info(
         f"🔍 **Columnas detectadas en Sistema:** {', '.join(df_sistema.columns.tolist())}"
