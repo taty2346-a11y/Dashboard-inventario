@@ -8,6 +8,34 @@ st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layo
 st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png", width=200)
 
 st.title("📊 Cuadro de Mando: Comparativa de Unidades (Lógica de Recuento)")
+# --- INICIO DEL MODO IMPRESIÓN (PDF LIMPIO) ---
+estilo_impresion = """
+<style>
+@media print {
+    /* Ocultar la barra lateral de configuración */
+    section[data-testid="stSidebar"] {
+        display: none !important;
+    }
+    /* Ocultar el menú de arriba a la derecha de Streamlit */
+    header {
+        display: none !important;
+    }
+    /* Ajustar los márgenes para que ocupe todo el ancho del PDF */
+    .block-container {
+        max-width: 100% !important;
+        padding-top: 1rem !important;
+        margin-top: 0 !important;
+    }
+    /* Forzar al navegador a imprimir los colores de fondo de las tarjetitas */
+    * {
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+</style>
+"""
+st.markdown(estilo_impresion, unsafe_allow_html=True)
+# --- FIN DEL MODO IMPRESIÓN ---
 st.markdown("Sube tu reporte de inventario. El sistema consolidará el Paso 1 y Paso 2 aplicando la regla de auditoría de Logisfashion.")
 
 # Subida del único fichero
