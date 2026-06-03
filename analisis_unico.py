@@ -7,8 +7,8 @@ import re
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
 st.sidebar.image("https://www.logisfashion.com/wp-content/uploads/2023/04/logisfashion-logo.png", width=200)
 
-st.title("📊 Cuadro de Mando: Comparativa de Unidades (Mismo Fichero)")
-st.markdown("Sube tu reporte de inventario para analizar las diferencias directamente entre las columnas de unidades.")
+st.title("📊 Cuadro de Mando: Comparativa de Unidades (Lógica de Recuento)")
+st.markdown("Sube tu reporte de inventario. El sistema consolidará el Paso 1 y Paso 2 aplicando la regla de auditoría de Logisfashion.")
 
 # Subida del único fichero
 archivo_carga = st.file_uploader("Cargar Archivo de Inventario (Excel/CSV)", type=["xlsx", "csv"])
@@ -26,15 +26,25 @@ if archivo_carga:
     default_sku = "Sku" if "Sku" in df.columns else (df.columns[0] if len(df.columns) > 0 else "")
     sku_col = st.sidebar.text_input("Columna de Código SKU", default_sku)
     
-    # Selección inteligente y automática de tus columnas reales
     opciones_columnas = df.columns.tolist()
     
+    # 1. Columna de Esperadas (Sistema)
     idx_expected = opciones_columnas.index("expectedUnits") if "expectedUnits" in opciones_columnas else 0
-    idx_read = opciones_columnas.index("ReadUnits") if "ReadUnits" in opciones_columnas else (1 if len(opciones_columnas) > 1 else 0)
+    col_expected = st.sidebar.selectbox("Columna de Unidades Esperadas (Sistema)", opciones_columnas, index=idx_expected)
     
-    col_cant_1 = st.sidebar.selectbox("Columna de Unidades Esperadas (Sistema)", opciones_columnas, index=idx_expected)
-    col_cant_2 = st.sidebar.selectbox("Columna de Unidades Leídas (Físico)", opciones_columnas, index=idx_read)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📥 Fases del Conteo Físico")
     
+    # 2. Intento de detección automática de los pasos de lectura
+    col_read_1_default = [c for c in opciones_columnas if "Read" in c]
+    
+    idx_r1 = opciones_columnas.index(col_read_1_default[0]) if len(col_read_1_default) > 0 else 0
+    idx_r2 = opciones_columnas.index(col_read_1_default[1]) if len(col_read_1_default) > 1 else (1 if len(opciones_columnas) > 1 else 0)
+    
+    col_read_1 = st.sidebar.selectbox("Lecturas Paso 1 (Primer Conteo)", opciones_columnas, index=idx_r1)
+    col_read_2 = st.sidebar.selectbox("Lecturas Paso 2 (Recuento por Descuadre)", opciones_columnas, index=idx_r2)
+    
+    st.sidebar.markdown("---")
     # Intentar autodetectar ubicación
     default_pos = "Posición" if "Posición" in opciones_columnas else ("Posicion" if "Posicion" in opciones_columnas else "Ubicacion")
     pos_col = st.sidebar.text_input("Columna de Ubicación (Opcional)", default_pos)
@@ -42,13 +52,26 @@ if archivo_carga:
     if st.sidebar.button("📊 Ejecutar Comparativa"):
         if sku_col not in df.columns:
             st.error(f"❌ La columna SKU '{sku_col}' no se encuentra en el archivo.")
+        elif col_expected not in df.columns:
+            st.error(f"❌ La columna Esperadas '{col_expected}' no se encuentra.")
         else:
-            # Asegurar que ambas columnas sean tratadas como números limpios
-            df[col_cant_1] = pd.to_numeric(df[col_cant_1], errors='coerce').fillna(0)
-            df[col_cant_2] = pd.to_numeric(df[col_cant_2], errors='coerce').fillna(0)
+            # Limpieza y conversión a números
+            df[col_expected] = pd.to_numeric(df[col_expected], errors='coerce').fillna(0)
+            df['Paso1_Num'] = pd.to_numeric(df[col_read_1], errors='coerce').fillna(0)
+            df['Paso2_Num'] = pd.to_numeric(df[col_read_2], errors='coerce').fillna(0)
             
-            # Calcular las diferencias matemáticas reales (Leído - Esperado)
-            df['Diferencia_Uds'] = df[col_cant_2] - df[col_cant_1]
+            # APLICACIÓN DE LA REGLA LOGÍSTICA:
+            # Si el Paso 2 se rellenó (es mayor que 0), se toma el Paso 2 como conteo final.
+            # Si el Paso 2 está a 0 o vacío, significa que el Paso 1 era correcto.
+            def calcular_total_leido(row):
+                if row['Paso2_Num'] > 0:
+                    return row['Paso2_Num']
+                return row['Paso1_Num']
+            
+            df['Total_Real_Leido'] = df.apply(calcular_total_leido, axis=1)
+            
+            # Calcular las diferencias matemáticas reales basadas en el consolidado (Leído - Esperado)
+            df['Diferencia_Uds'] = df['Total_Real_Leido'] - df[col_expected]
             df['Desviacion_Absoluta'] = df['Diferencia_Uds'].abs()
             
             # --- SECCIÓN 1: MÉTRICAS CLAVE ---
@@ -57,8 +80,8 @@ if archivo_carga:
             m1, m2, m3, m4 = st.columns(4)
             
             m1.metric("Total SKU Analizados", f"{len(df[sku_col].unique()):,}")
-            m2.metric(f"Total {col_cant_1}", f"{int(df[col_cant_1].sum()):,}")
-            m3.metric(f"Total {col_cant_2}", f"{int(df[col_cant_2].sum()):,}")
+            m2.metric("Total Unidades Esperadas", f"{int(df[col_expected].sum()):,}")
+            m3.metric("Total Unidades Consolidadas", f"{int(df['Total_Real_Leido'].sum()):,}")
             
             descuadre_neto = int(df['Diferencia_Uds'].sum())
             m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
@@ -66,7 +89,6 @@ if archivo_carga:
             # --- SECCIÓN 2: GRÁFICOS DE DESVIACIONES ---
             st.write("---")
             st.subheader("🔥 Análisis de Variaciones Línea a Línea")
-            
             col_g1, col_g2 = st.columns(2)
             
             with col_g1:
@@ -90,7 +112,7 @@ if archivo_carga:
                                      color_continuous_scale=["#E53E3E", "#00818A"])
                     st.plotly_chart(fig_pos, use_container_width=True)
                 else:
-                    st.info("💡 Agrega una columna de ubicación válida para visualizar el desglose por estanterías.")
+                    st.info("💡 Agrega una ubicación válida para ver los descuadres por estantería.")
             
             # --- SECCIÓN 3: ALGORITMOS INTELIGENTES AVANZADOS ---
             st.write("---")
@@ -120,29 +142,24 @@ if archivo_carga:
                     else:
                         st.info("No se encontraron patrones de prendas idénticas movidas de un hueco a otro.")
                 else:
-                    st.warning("⚠️ Se necesita una columna de ubicación válida para calcular traspasos.")
+                    st.warning("⚠️ Se necesita una ubicación válida para calcular traspasos.")
                     
             with col_b:
-                st.markdown("### 🏷️ Posibles Cruces de Talla o Variante (Cualquier Formato)")
+                st.markdown("### 🏷️ Posibles Cruces de Talla o Variante (Tallas Complejas)")
                 if tiene_pos:
                     cruces_talla = []
                     
-                    # NUEVA LÓGICA ULTRA-FLEXIBLE:
-                    # Busca el último separador (-, _, /) y se queda con lo de antes. 
-                    # Si no tiene separador, usa el SKU completo.
+                    # Identifica el modelo base eliminando el último guion/barra con número o letra (ej: -18, -22, -M)
                     def extraer_raiz_definitiva(sku):
                         sku_str = str(sku).strip()
-                        # Divide usando el último guion o barra baja que encuentre
                         partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
                         if len(partes) > 1:
-                            return partes[0] # Retorna la raíz antes del último separador
+                            return partes[0]
                         return sku_str
 
                     df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz_definitiva)
                     
-                    # Agrupar por ubicación y por el modelo base
                     for (pos, raiz), g in df.groupby([pos_col, 'Raiz_Modelo']):
-                        # Si en una misma ubicación el neto de diferencias da 0, pero hay descuadres individuales internos
                         if len(g) > 1 and int(g['Diferencia_Uds'].sum()) == 0 and (g['Diferencia_Uds'] != 0).any():
                             detalles = ", ".join([f"{row[sku_col]}: {int(row['Diferencia_Uds'])}" for _, row in g.iterrows() if row['Diferencia_Uds'] != 0])
                             cruces_talla.append({
@@ -153,22 +170,22 @@ if archivo_carga:
                     if cruces_talla:
                         st.dataframe(pd.DataFrame(cruces_talla), use_container_width=True)
                     else:
-                        st.info("No se detectaron errores cruzados de variantes (Sobra una talla / Falta otra) en el mismo hueco.")
+                        st.info("No se detectaron errores de tallas cruzadas en el mismo hueco.")
                 else:
                     st.warning("⚠️ Se necesita una columna de ubicación válida para calcular cruces de variantes.")
             
-            # --- SECCIÓN 4: TABLA DE DATOS ORDENADA ---
+            # --- SECCIÓN 4: TABLA DE DATOS DETALLADA ---
             st.write("---")
             st.subheader("📋 Detalle de la Comparación Realizada")
             
             cols_prioritarias = [sku_col]
             if tiene_pos: cols_prioritarias.append(pos_col)
-            cols_prioritarias += [col_cant_1, col_cant_2, 'Diferencia_Uds']
+            cols_prioritarias += [col_expected, col_read_1, col_read_2, 'Total_Real_Leido', 'Diferencia_Uds']
             
-            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c != 'Desviacion_Absoluta' and c != 'Raiz_Modelo']
+            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c not in ['Desviacion_Absoluta', 'Raiz_Modelo', 'Paso1_Num', 'Paso2_Num']]
             df_final = df[cols_prioritarias + resto_columnas]
             
             st.dataframe(df_final, use_container_width=True)
             
             csv = df_final.to_csv(index=False).encode('utf-8')
-            st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_inventario.csv", mime="text/csv")
+            st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_consolidada.csv", mime="text/csv")
