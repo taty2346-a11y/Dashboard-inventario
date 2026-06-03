@@ -1,8 +1,3 @@
-
-Tania Sanchez Orellana <taty2346@gmail.com>
-21:04 (hace 0 minutos)
-para mí
-
 import pandas as pd
 import plotly.express as px
 import streamlit as st
