@@ -3,19 +3,19 @@ import plotly.express as px
 import streamlit as st
 import re
 
-# Configuración básica
+# Configuración básica de la página
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
 
-# --- ESTILOS: FONDO BLANCO, CABECERAS AZUL MARINO Y BOTÓN/DETALLES TURQUESA ---
+# --- INYECCIÓN DE ESTILOS: FONDO BLANCO, AZUL MARINO Y TURQUESA ---
 st.markdown("""
 <style>
     /* Fondo general limpio */
     .stApp { background-color: #ffffff !important; }
     
-    /* Textos y títulos */
+    /* Títulos y textos principales */
     h1, h2, h3 { color: #002e5d !important; font-family: 'Segoe UI', sans-serif; }
     
-    /* Tarjetas de métricas (borde turquesa suave) */
+    /* Tarjetas de métricas (borde turquesa) */
     div[data-testid="stMetric"] {
         background-color: #f9fbfb !important;
         border: 1px solid #00818a !important;
@@ -23,55 +23,69 @@ st.markdown("""
         padding: 15px !important;
     }
     
-    /* Botón de ejecutar (El color que te gusta) */
+    /* Botón de ejecutar (Color Turquesa) */
     div.stButton > button:first-child {
         background-color: #00818a !important;
         color: white !important;
         border-radius: 8px !important;
         border: none !important;
         font-weight: bold !important;
+        padding: 0.5rem 2rem !important;
     }
     
-    /* Estilo de tablas y otros */
+    div.stButton > button:first-child:hover {
+        background-color: #00a4b0 !important;
+    }
+    
+    /* Estilos de tablas */
     .stDataFrame { border: 1px solid #e0e0e0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# Logo (Usando la URL remota para evitar errores de carga)
-URL_LOGO_CORPORATIVO = "https://cdn.brandfetch.io/idBNTSMPCj/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1752693425078"
-st.sidebar.image(URL_LOGO_CORPORATIVO, width=160)
+# Logo (URL remota para evitar errores)
+URL_LOGO = "https://cdn.brandfetch.io/idBNTSMPCj/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1752693425078"
+st.sidebar.image(URL_LOGO, width=160)
 
 st.title("📊 Cuadro de Mando: Comparativa de Unidades")
-st.markdown("Sube tu reporte de inventario para comenzar el análisis.")
+st.markdown("Sube tu reporte de inventario para aplicar la auditoría de Logisfashion.")
 
-# Lógica principal
-archivo_carga = st.file_uploader("Cargar Archivo de Inventario (Excel/CSV)", type=["xlsx", "csv"])
+# Subida del archivo
+archivo_carga = st.file_uploader("Cargar Archivo (Excel/CSV)", type=["xlsx", "csv"])
 
 if archivo_carga:
     df = pd.read_excel(archivo_carga) if archivo_carga.name.endswith(".xlsx") else pd.read_csv(archivo_carga)
     
     st.sidebar.header("⚙️ Configuración")
-    sku_col = st.sidebar.text_input("Columna de Código SKU", "Sku")
-    
+    sku_col = st.sidebar.text_input("Columna SKU", "Sku")
     opciones = df.columns.tolist()
-    col_expected = st.sidebar.selectbox("Columna Unidades Esperadas", opciones, index=0)
+    
+    col_expected = st.sidebar.selectbox("Columna Esperadas", opciones, index=0)
     col_read_1 = st.sidebar.selectbox("Lecturas Paso 1", opciones, index=0)
     col_read_2 = st.sidebar.selectbox("Lecturas Paso 2", opciones, index=1 if len(opciones)>1 else 0)
+    pos_col = st.sidebar.text_input("Columna Ubicación", "Posición")
     
     if st.sidebar.button("📊 Ejecutar Comparativa"):
-        # Cálculos
-        df['Total_Real_Leido'] = df[col_read_2].apply(lambda x: x if x > 0 else df[col_read_1])
-        df['Diferencia'] = df['Total_Real_Leido'] - df[col_expected]
+        # Limpieza y Cálculos
+        df['Total_Real_Leido'] = df.apply(lambda row: row[col_read_2] if pd.to_numeric(row[col_read_2], errors='coerce') > 0 else row[col_read_1], axis=1)
+        df['Diferencia'] = pd.to_numeric(df['Total_Real_Leido'], errors='coerce') - pd.to_numeric(df[col_expected], errors='coerce')
         
+        # Métricas
         st.subheader("📌 Resumen Ejecutivo")
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Unidades Esperadas", f"{int(df[col_expected].sum()):,}")
-        m2.metric("Unidades Reales", f"{int(df['Total_Real_Leido'].sum()):,}")
-        m3.metric("Diferencia Neto", f"{int(df['Diferencia'].sum()):,}")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("SKUs", f"{len(df[sku_col].unique()):,}")
+        m2.metric("Esperadas", f"{int(df[col_expected].sum()):,}")
+        m3.metric("Leídas", f"{int(df['Total_Real_Leido'].sum()):,}")
+        m4.metric("Diferencia Neto", f"{int(df['Diferencia'].sum()):,}")
         
-        st.subheader("🔥 Gráfico de Descuadres")
+        # Gráficos
+        st.subheader("🔥 Análisis de Descuadres")
         fig = px.bar(df, x=sku_col, y='Diferencia', color_discrete_sequence=['#00818a'])
         st.plotly_chart(fig, use_container_width=True)
         
-        st.subheader("📋 Detalle")
+        # Tabla
+        st.subheader("📋 Detalle de Datos")
         st.dataframe(df, use_container_width=True)
+        
+        # Descarga
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("💾 Descargar Resultados (CSV)", data=csv, file_name="resultado.csv", mime="text/csv")
