@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import re
 
 # Configuración básica e imagen corporativa
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
@@ -21,7 +22,7 @@ if archivo_carga:
     
     st.sidebar.header("⚙️ Configuración de Columnas")
     
-    # Intentar autodetectar la columna de SKU (buscando variantes comunes)
+    # Intentar autodetectar la columna de SKU
     default_sku = "Sku" if "Sku" in df.columns else (df.columns[0] if len(df.columns) > 0 else "")
     sku_col = st.sidebar.text_input("Columna de Código SKU", default_sku)
     
@@ -40,7 +41,7 @@ if archivo_carga:
     
     if st.sidebar.button("📊 Ejecutar Comparativa"):
         if sku_col not in df.columns:
-            st.error(f"❌ La columna SKU '{sku_col}' no se encuentra en el archivo. Verifica las mayúsculas en la lista azul superior.")
+            st.error(f"❌ La columna SKU '{sku_col}' no se encuentra en el archivo.")
         else:
             # Asegurar que ambas columnas sean tratadas como números limpios
             df[col_cant_1] = pd.to_numeric(df[col_cant_1], errors='coerce').fillna(0)
@@ -89,22 +90,82 @@ if archivo_carga:
                                      color_continuous_scale=["#E53E3E", "#00818A"])
                     st.plotly_chart(fig_pos, use_container_width=True)
                 else:
-                    st.info("💡 Si la tabla contiene columnas de estantería o hueco, escribe su nombre exacto en la izquierda para ver el mapa de calor.")
+                    st.info("💡 Agrega una columna de ubicación válida para visualizar el desglose por estanterías.")
             
-            # --- SECCIÓN 3: TABLA DE DATOS ORDENADA Y COPIA EN CSV ---
+            # --- SECCIÓN 3: ALGORITMOS INTELIGENTES AVANZADOS ---
+            st.write("---")
+            st.subheader("🧠 Diagnósticos Automáticos de Operaciones (Detección de Patrones)")
+            col_a, col_b = st.columns(2)
+            
+            tiene_pos = pos_col in df.columns
+            
+            with col_a:
+                st.markdown("### 🔄 Mercancía Reubicada (Mismo artículo en huecos distintos)")
+                if tiene_pos:
+                    faltas = df[df['Diferencia_Uds'] < 0]
+                    sobras = df[df['Diferencia_Uds'] > 0]
+                    reubicaciones = []
+                    
+                    for _, f in faltas.iterrows():
+                        # Buscar si el mismo SKU tiene un sobrante idéntico en otra ubicación
+                        match = sobras[(sobras[sku_col] == f[sku_col]) & (sobras['Diferencia_Uds'] == abs(f['Diferencia_Uds']))]
+                        for _, s in match.iterrows():
+                            reubicaciones.append({
+                                "SKU": f[sku_col],
+                                "Ubicación Origen (Falta)": f[pos_col],
+                                "Ubicación Destino (Sobra)": s[pos_col],
+                                "Cantidad Cruzada": int(abs(f['Diferencia_Uds']))
+                            })
+                    if reubicaciones:
+                        st.dataframe(pd.DataFrame(reubicaciones).drop_duplicates(), use_container_width=True)
+                    else:
+                        st.info("No se encontraron patrones de prendas idénticas movidas de un hueco a otro.")
+                else:
+                    st.warning("⚠️ Se necesita una columna de ubicación válida para calcular traspasos.")
+                    
+            with col_b:
+                st.markdown("### 🏷️ Posibles Cruces de Talla o Variante (Letras o Números)")
+                if tiene_pos:
+                    cruces_talla = []
+                    
+                    # Función inteligente para extraer la raíz del artículo (elimina sufijos de talla comunes como -M, _42, -XL, etc.)
+                    def extraer_raiz(sku):
+                        text = str(sku)
+                        # Busca guiones o barras bajas seguidos de letras o números al final (ej: -XL, _42, -S, -38)
+                        raiz = re.sub(r'[-_]([A-Za-z]+|\d+)$', '', text)
+                        return raiz
+
+                    df['Raiz_Modelo'] = df[sku_col].apply(extraer_raiz)
+                    
+                    # Agrupar por ubicación y por el modelo base
+                    for (pos, raiz), g in df.groupby([pos_col, 'Raiz_Modelo']):
+                        # Si en una misma ubicación hay más de una variante, el neto es 0 pero hay descuadres individuales
+                        if len(g) > 1 and g['Diferencia_Uds'].sum() == 0 and (g['Diferencia_Uds'] != 0).any():
+                            detalles = ", ".join([f"{row[sku_col]}: {int(row['Diferencia_Uds'])}" for _, row in g.iterrows() if row['Diferencia_Uds'] != 0])
+                            cruces_talla.append({
+                                "Ubicación": pos,
+                                "Modelo Base": raiz,
+                                "Descuadre Interno de Variantes": detalles
+                            })
+                    if cruces_talla:
+                        st.dataframe(pd.DataFrame(cruces_talla), use_container_width=True)
+                    else:
+                        st.info("No se detectaron errores cruzados de variantes (Sobra una talla / Falta otra) en el mismo hueco.")
+                else:
+                    st.warning("⚠️ Se necesita una columna de ubicación válida para calcular cruces de variantes.")
+            
+            # --- SECCIÓN 4: TABLA DE DATOS ORDENADA ---
             st.write("---")
             st.subheader("📋 Detalle de la Comparación Realizada")
             
-            # Reorganizar el orden visual de la tabla para que sea hiperfácil de leer en la reunión
             cols_prioritarias = [sku_col]
-            if pos_col in df.columns: cols_prioritarias.append(pos_col)
+            if tiene_pos: cols_prioritarias.append(pos_col)
             cols_prioritarias += [col_cant_1, col_cant_2, 'Diferencia_Uds']
             
-            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c != 'Desviacion_Absoluta']
+            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c != 'Desviacion_Absoluta' and c != 'Raiz_Modelo']
             df_final = df[cols_prioritarias + resto_columnas]
             
             st.dataframe(df_final, use_container_width=True)
             
-            # Botón de exportación inmediata
             csv = df_final.to_csv(index=False).encode('utf-8')
-            st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_expected_vs_read.csv", mime="text/csv")
+            st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_inventario.csv", mime="text/csv")
