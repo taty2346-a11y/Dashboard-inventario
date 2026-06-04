@@ -45,5 +45,4 @@ if archivo_sistema and archivo_fisico:
            # Botón de descarga
            csv = df_merge.to_csv(index=False).encode('utf-8')
            st.download_button("💾 Descargar Comparativa", data=csv, file_name="resultado_auditoria.csv", mime="text/csv")
-       except Exception as e:
-           st.error(f"Error técnico: {e}. Asegúrate de haber seleccionado columnas numéricas.")
+       
