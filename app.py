@@ -47,5 +47,3 @@ if archivo_sistema and archivo_fisico:
            st.download_button("💾 Descargar Comparativa", data=csv, file_name="resultado_auditoria.csv", mime="text/csv")
        except Exception as e:
            st.error(f"Error técnico: {e}. Asegúrate de haber seleccionado columnas numéricas.")
-else:
-st.info("⚠️ Sube ambos archivos para realizar el análisis.")
