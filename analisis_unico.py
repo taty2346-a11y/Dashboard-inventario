@@ -189,11 +189,13 @@ if archivo_carga:
             # --- SECCIÓN 1: MÉTRICAS CLAVE ---
             st.write("---")
             st.subheader("📌 Resumen Ejecutivo de Descuadres")
-            m1, m2, m3, m4 = st.columns(4)
+            m1, m2, m3, m4, m5 = st.columns(5)
             
-            m1.metric("Total SKU Analizados", f"{len(df[sku_col].unique()):,}")
-            m2.metric("Total Unidades Esperadas", f"{int(df[col_expected].sum()):,}")
-            m3.metric("Total Unidades Consolidadas", f"{int(df['Total_Real_Leido'].sum()):,}")
+            m1.metric("SKUs", f"{len(df[sku_col].unique()):,}")
+            m2.metric("Total Esperado", f"{int(df[col_expected].sum()):,}")
+            m3.metric("Total LOST (Faltas)", f"{int(total_lost):,}")
+            m4.metric("Total FOUND (Sobras)", f"{int(total_found):,}")
+            m5.metric("Neto Global", f"{int(df['Diferencia_Uds'].sum()):,}")
             
             descuadre_neto = int(df['Diferencia_Uds'].sum())
             m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
