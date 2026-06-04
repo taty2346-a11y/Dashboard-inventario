@@ -310,4 +310,4 @@ if archivo_carga:
             st.dataframe(df_final, use_container_width=True)
             
             csv = df_final.to_csv(index=False).encode('utf-8')
-            st.download_button(label="💾 Guardar Reporte Comparativo (Excel)", data=excel_data, file_name="comparativa_consolidada.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_consolidada.csv", mime="text/csv")
