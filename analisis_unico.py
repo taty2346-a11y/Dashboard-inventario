@@ -199,13 +199,10 @@ if archivo_carga:
             m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
             
             st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
-            p1, p2, p3, p4, p5, p6 = st.columns(6)
+            p1, p2, p3 = st.columns(6)
             p1.metric("📦 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
             p2.metric("👕 Cruces de Talla", f"{pct_tallas:.1f}%")
             p3.metric("📉 Descuadre Real Neto", f"{pct_puro:.1f}%")
-            p4.metric("📉 % LOST (Faltantes)", f"{pct_lost:.1f}%")
-            p5.metric("📈 % FOUND (Sobrantes)", f"{pct_found:.1f}%")
-            p6.metric("🔄 Total Movimientos", f"{total_mov:,}")
             
             # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
             st.write("---")
