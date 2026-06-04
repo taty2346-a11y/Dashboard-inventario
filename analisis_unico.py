@@ -200,9 +200,9 @@ if archivo_carga:
             
             st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
             p1, p2, p3 = st.columns(3)
-            p1.metric("📉 % LOST (Faltantes)", f"{pct_lost:.1f}%")
-            p2.metric("📈 % FOUND (Sobrantes)", f"{pct_found:.1f}%")
-            p3.metric("🔄 Total Movimientos", f"{total_mov:,}")
+            p1.metric("📦 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
+            p2.metric("👕 Cruces de Talla", f"{pct_tallas:.1f}%")
+            p3.metric("📉 Descuadre Real Neto", f"{pct_puro:.1f}%")
             
             # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
             st.write("---")
