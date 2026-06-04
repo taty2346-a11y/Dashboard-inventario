@@ -200,9 +200,9 @@ if archivo_carga:
             
             st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
             p1, p2, p3 = st.columns(3)
-            p1.metric("🔄 Peso de Mercancía Reubicada", f"{pct_reubicados:.1f}%")
-            p2.metric("🏷️ Peso de Cruces de Talla", f"{pct_tallas:.1f}%")
-            p3.metric("🚨 Peso de Descuadre Real Neto", f"{pct_puro:.1f}%")
+            p1.metric("🔄 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
+            p2.metric("🏷️ Cruces de Talla", f"{pct_tallas:.1f}%")
+            p3.metric("🚨 Descuadre Real Neto", f"{pct_puro:.1f}%")
             
             # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
             st.write("---")
