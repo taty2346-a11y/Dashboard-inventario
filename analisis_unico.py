@@ -308,12 +308,6 @@ if archivo_carga:
             df_final = df[cols_prioritarias + resto_columnas]
             
             st.dataframe(df_final, use_container_width=True)
-            import io
-
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df_final.to_excel(writer, index=False, sheet_name='Reporte')
-            excel_data = output.getvalue()
-
+            
             csv = df_final.to_csv(index=False).encode('utf-8')
             st.download_button("💾 Guardar Reporte Comparativo (CSV)", data=csv, file_name="comparativa_consolidada.csv", mime="text/csv")
