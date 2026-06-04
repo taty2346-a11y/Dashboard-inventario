@@ -10,6 +10,10 @@ st.sidebar.image(URL_LOGO_CORPORATIVO, width=150)
 # Configuración básica de la página
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
 
+# URL del nuevo logo corporativo facilitado por el usuario
+URL_LOGO_CORPORATIVO = "https://cdn.brandfetch.io/idBNTSMPCj/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1752693425078"
+st.sidebar.image(URL_LOGO_CORPORATIVO, width=150)
+
 # --- INYECCIÓN DE ESTILOS CORPORATIVOS LOGISFASHION Y MODO IMPRESIÓN ---
 st.markdown("""
 <style>
