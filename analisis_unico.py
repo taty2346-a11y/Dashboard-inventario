@@ -186,23 +186,16 @@ if archivo_carga:
             else:
                 pct_reubicados, pct_tallas, pct_puro = 0.0, 0.0, 0.0
 
-            # --- SECCIÓN 1: MÉTRICAS CLAVE ---
-            st.write("---")
-            st.subheader("📌 Resumen Ejecutivo de Descuadres")
-            m1, m2, m3, m4 = st.columns(4)
-            
-            m1.metric("Total SKU Analizados", f"{len(df[sku_col].unique()):,}")
-            m2.metric("Total Unidades Esperadas", f"{int(df[col_expected].sum()):,}")
-            m3.metric("Total Unidades Consolidadas", f"{int(df['Total_Real_Leido'].sum()):,}")
-            
-            descuadre_neto = int(df['Diferencia_Uds'].sum())
-            m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
-            
-            st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
-            p1, p2, p3 = st.columns(3)
-            p1.metric("🔄 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
-            p2.metric("🏷️ Cruces de Talla", f"{pct_tallas:.1f}%")
-            p3.metric("🚨 Descuadre Real Neto", f"{pct_puro:.1f}%")
+# Mostrar Métricas
+        st.subheader("📌 Resumen Ejecutivo")
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric("Correcto", len(df[df['Categoria'] == "Correcto"]))
+        c2.metric("Found", len(df[df['Categoria'] == "Found"]))
+        c3.metric("Lost", len(df[df['Categoria'] == "Lost"]))
+        c4.metric("Reubicado", total_reubicados)
+        c5.metric("Cambio Talla", total_tallas)
+        
+        st.dataframe(df, use_container_width=True)
             
             # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
             st.write("---")
