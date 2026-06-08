@@ -45,7 +45,6 @@ st.markdown("""
             position: static !important;
             background-color: white !important;
         }
-        
         /* Ocultar la barra lateral izquierda por completo en el PDF */
         section[data-testid="stSidebar"] {
             display: none !important;
