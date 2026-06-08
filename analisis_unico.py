@@ -10,6 +10,10 @@ st.sidebar.image(URL_LOGO_CORPORATIVO, width=150)
 # Configuración básica de la página
 st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layout="wide")
 
+# URL del nuevo logo corporativo facilitado por el usuario
+URL_LOGO_CORPORATIVO = "https://cdn.brandfetch.io/idBNTSMPCj/w/400/h/400/theme/dark/icon.jpeg?c=1bxid64Mup7aczewSAYMX&t=1752693425078"
+st.sidebar.image(URL_LOGO_CORPORATIVO, width=150)
+
 # --- INYECCIÓN DE ESTILOS CORPORATIVOS LOGISFASHION Y MODO IMPRESIÓN ---
 st.markdown("""
 <style>
@@ -28,7 +32,7 @@ st.markdown("""
         border: none !important;
         font-weight: bold !important;
         padding: 0.5rem 2rem !important;
-        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0, 1);
+        box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
     }
     
     div.stButton > button:first-child:hover {
@@ -186,16 +190,23 @@ if archivo_carga:
             else:
                 pct_reubicados, pct_tallas, pct_puro = 0.0, 0.0, 0.0
 
-            # MÉTRICAS ACTUALIZADAS
-        st.subheader("📌 Resumen de Auditoría")
-        cols = st.columns(5)
-        cols[0].metric("Correcto", len(df[df['Categoria'] == "Correcto"]))
-        cols[1].metric("Found", len(df[df['Categoria'] == "Found"]))
-        cols[2].metric("Lost", len(df[df['Categoria'] == "Lost"]))
-        cols[3].metric("Reubicado", "Pendiente") # Ajustar según tu lógica de cálculo
-        cols[4].metric("Cambio Talla", "Pendiente")
-        
-        st.dataframe(df)
+            # --- SECCIÓN 1: MÉTRICAS CLAVE ---
+            st.write("---")
+            st.subheader("📌 Resumen Ejecutivo de Descuadres")
+            m1, m2, m3, m4 = st.columns(4)
+            
+            m1.metric("Total SKU Analizados", f"{len(df[sku_col].unique()):,}")
+            m2.metric("Total Unidades Esperadas", f"{int(df[col_expected].sum()):,}")
+            m3.metric("Total Unidades Consolidadas", f"{int(df['Total_Real_Leido'].sum()):,}")
+            
+            descuadre_neto = int(df['Diferencia_Uds'].sum())
+            m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
+            
+            st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
+            p1, p2, p3 = st.columns(3)
+            p1.metric("🔄 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
+            p2.metric("🏷️ Cruces de Talla", f"{pct_tallas:.1f}%")
+            p3.metric("🚨 Descuadre Real Neto", f"{pct_puro:.1f}%")
             
             # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
             st.write("---")
