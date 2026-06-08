@@ -158,7 +158,11 @@ if archivo_carga:
                         s_sku_total = sobras[sobras[sku_col] == sku]['Diferencia_Uds'].sum()
                         total_uds_reubicadas += min(f_sku_total, s_sku_total)
                         skus_procesados.add(sku)
-                
+                def clasificar(row):
+            if row['Dif'] == 0: return "CORRECTO"
+            if row['Dif'] > 0: return "FOUND (Sobrante)"
+            if row['Dif'] < 0: return "LOST (Faltante)"
+            return "OTROS"
                 def extraer_raiz_definitiva(sku):
                     sku_str = str(sku).strip()
                     partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
