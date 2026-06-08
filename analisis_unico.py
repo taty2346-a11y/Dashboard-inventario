@@ -142,27 +142,17 @@ if archivo_carga:
             df['Diferencia_Uds'] = df['Total_Real_Leido'] - df[col_expected]
             df['Desviacion_Absoluta'] = df['Diferencia_Uds'].abs()
             
-            # --- ALGORITMOS DE CLASIFICACIÓN DE ERROR ---
-            total_uds_reubicadas = 0
-            total_uds_cruces_talla = 0
-            
-            if tiene_pos:
-                faltas = df[df['Diferencia_Uds'] < 0].copy()
-                sobras = df[df['Diferencia_Uds'] > 0].copy()
-                skus_procesados = set()
-                
-                for _, f in faltas.iterrows():
-                    sku = f[sku_col]
-                    if sku not in skus_procesados:
-                        f_sku_total = abs(faltas[faltas[sku_col] == sku]['Diferencia_Uds'].sum())
-                        s_sku_total = sobras[sobras[sku_col] == sku]['Diferencia_Uds'].sum()
-                        total_uds_reubicadas += min(f_sku_total, s_sku_total)
-                        skus_procesados.add(sku)
-                def clasificar(row):
-            if row['Dif'] == 0: return "CORRECTO"
-            if row['Dif'] > 0: return "FOUND (Sobrante)"
-            if row['Dif'] < 0: return "LOST (Faltante)"
-            return "OTROS"
+          # --- CÁLCULOS DE CLASIFICACIÓN ---
+        # (Aquí va tu lógica de reubicación y cruces de talla)
+        total_desviacion = df['Desviacion_Absoluta'].sum()
+        
+        # --- MOSTRAR RESULTADOS ---
+        st.subheader("📌 Resumen Ejecutivo")
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("SKUs", f"{len(df[sku_col].unique()):,}")
+        m2.metric("Esperadas", f"{int(df[col_expected].sum()):,}")
+        m3.metric("Reales", f"{int(df['Total_Real_Leido'].sum()):,}")
+        m4.metric("Diferencia", f"{int(df['Diferencia_Uds'].sum()):,}")
                 def extraer_raiz_definitiva(sku):
                     sku_str = str(sku).strip()
                     partes = re.split(r'[-_/](?=[^-/_]*$)', sku_str)
