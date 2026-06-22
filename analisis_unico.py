@@ -38,7 +38,6 @@ st.markdown("""
 
     /* ---- REGLAS ESPECIALES PARA IMPRESIÓN A PDF COMPLETO (SIN CORTES) ---- */
     @media print {
-        /* Romper el scroll interno de Streamlit para que imprima todas las páginas hacia abajo */
         html, body, .stApp, .main, .block-container, [data-testid="stAppViewContainer"] {
             overflow: visible !important;
             height: auto !important;
@@ -46,17 +45,14 @@ st.markdown("""
             background-color: white !important;
         }
         
-        /* Ocultar la barra lateral izquierda por completo en el PDF */
         section[data-testid="stSidebar"] {
             display: none !important;
         }
         
-        /* Ocultar elementos web innecesarios (menús superiores y decoraciones) */
         header, footer, [data-testid="stHeader"], [data-testid="stDecoration"] {
             display: none !important;
         }
         
-        /* Forzar a las cajas a usar todo el ancho disponible del papel */
         .block-container {
             max-width: 100% !important;
             padding-top: 0rem !important;
@@ -64,13 +60,11 @@ st.markdown("""
             margin: 0 !important;
         }
         
-        /* Asegurar que el navegador respete los colores de las gráficas y las tarjetas KPIs */
         * {
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
         }
         
-        /* Evitar que los bloques de gráficos se partan por la mitad a mitad de folio */
         .stPlotlyChart, div[data-testid="stMetric"], div[data-testid="stDataFrame"] {
             page-break-inside: avoid !important;
             margin-bottom: 20px !important;
@@ -82,11 +76,9 @@ st.markdown("""
 st.title("📊 Cuadro de Mando: Comparativa de Unidades (Lógica de Recuento)")
 st.markdown("Sube tu reporte de inventario. El sistema consolidará el Paso 1 y Paso 2 aplicando la regla de auditoría de Logisfashion.")
 
-# Subida del único fichero
 archivo_carga = st.file_uploader("Cargar Archivo de Inventario (Excel/CSV)", type=["xlsx", "csv"])
 
 if archivo_carga:
-    # Lectura automática del archivo
     df = pd.read_excel(archivo_carga) if archivo_carga.name.endswith(".xlsx") else pd.read_csv(archivo_carga)
     
     st.info(f"🔍 **Columnas detectadas en el archivo:** {', '.join(df.columns.tolist())}")
@@ -122,7 +114,6 @@ if archivo_carga:
         elif col_expected not in df.columns:
             st.error(f"❌ La columna Esperadas '{col_expected}' no se encuentra.")
         else:
-            # Limpieza básica de datos
             df[sku_col] = df[sku_col].astype(str).str.strip()
             tiene_pos = pos_col in df.columns
             if tiene_pos:
@@ -146,11 +137,11 @@ if archivo_carga:
             total_uds_reubicadas = 0
             total_uds_cruces_talla = 0
             
+            faltas = df[df['Diferencia_Uds'] < 0].copy()
+            sobras = df[df['Diferencia_Uds'] > 0].copy()
+
             if tiene_pos:
-                faltas = df[df['Diferencia_Uds'] < 0].copy()
-                sobras = df[df['Diferencia_Uds'] > 0].copy()
                 skus_procesados = set()
-                
                 for _, f in faltas.iterrows():
                     sku = f[sku_col]
                     if sku not in skus_procesados:
@@ -177,14 +168,28 @@ if archivo_carga:
                             total_uds_cruces_talla += min(t_faltas, t_sobras)
 
             total_desviacion_absoluta = df['Desviacion_Absoluta'].sum()
-            uds_descuadre_puro = max(0, total_desviacion_absoluta - (total_uds_reubicadas * 2) - (total_uds_cruces_talla * 2))
             
+            # --- NUEVA LÓGICA SOLICITADA: DESGLOSE DE LOST, FOUND Y SIN AJUSTES ---
+            # 1. Calculamos los totales brutos de faltas y sobras
+            total_faltas_brutas = abs(df[df['Diferencia_Uds'] < 0]['Diferencia_Uds'].sum())
+            total_sobras_brutas = df[df['Diferencia_Uds'] > 0]['Diferencia_Uds'].sum()
+            
+            # 2. Descontamos los cruces y reubicaciones de forma equitativa (1 unidad de cruce descuenta 1 falta y 1 sobra)
+            uds_lost_puro = max(0, total_faltas_brutas - total_uds_reubicadas - total_uds_cruces_talla)
+            uds_found_puro = max(0, total_sobras_brutas - total_uds_reubicadas - total_uds_cruces_talla)
+            
+            # 3. Porcentaje de líneas que están perfectas de origen (Sin Ajustes)
+            lineas_sin_ajuste = len(df[df['Diferencia_Uds'] == 0])
+            pct_sin_ajustes = (lineas_sin_ajuste / len(df)) * 100 if len(df) > 0 else 0.0
+            
+            # 4. Cálculo de porcentajes sobre la desviación absoluta total
             if total_desviacion_absoluta > 0:
                 pct_reubicados = ((total_uds_reubicadas * 2) / total_desviacion_absoluta) * 100
                 pct_tallas = ((total_uds_cruces_talla * 2) / total_desviacion_absoluta) * 100
-                pct_puro = (uds_descuadre_puro / total_desviacion_absoluta) * 100
+                pct_lost = (uds_lost_puro / total_desviacion_absoluta) * 100
+                pct_found = (uds_found_puro / total_desviacion_absoluta) * 100
             else:
-                pct_reubicados, pct_tallas, pct_puro = 0.0, 0.0, 0.0
+                pct_reubicados, pct_tallas, pct_lost, pct_found = 0.0, 0.0, 0.0, 0.0
 
             # --- SECCIÓN 1: MÉTRICAS CLAVE ---
             st.write("---")
@@ -199,10 +204,13 @@ if archivo_carga:
             m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
             
             st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
-            p1, p2, p3 = st.columns(3)
+            # Ampliamos a 5 columnas para incluir el nuevo desglose detallado
+            p1, p2, p3, p4, p5 = st.columns(5)
             p1.metric("🔄 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
             p2.metric("🏷️ Cruces de Talla", f"{pct_tallas:.1f}%")
-            p3.metric("🚨 Descuadre Real Neto", f"{pct_puro:.1f}%")
+            p3.metric("📉 Lost (Faltas Puras)", f"{pct_lost:.1f}%")
+            p4.metric("📈 Found (Sobras Puras)", f"{pct_found:.1f}%")
+            p5.metric("✅ Sin Ajustes (Líneas OK)", f"{pct_sin_ajustes:.1f}%")
             
             # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
             st.write("---")
@@ -214,7 +222,6 @@ if archivo_carga:
                 df_sku = df.groupby(sku_col)[['Diferencia_Uds', 'Desviacion_Absoluta']].sum().reset_index()
                 top_descuadres = df_sku.sort_values(by='Desviacion_Absoluta', ascending=False).head(10)
                 
-                # Paleta corporativa: Faltantes en rojo suave, Sobrantes en turquesa Logisfashion
                 fig_sku = px.bar(top_descuadres, x=sku_col, y='Diferencia_Uds', color='Diferencia_Uds',
                                  title="Sobrantes (Turquesa) vs Faltantes (Rojo) por Artículo",
                                  color_continuous_scale=["#E53E3E", "#00818A"])
