@@ -14,13 +14,11 @@ st.set_page_config(page_title="Comparativa Logisfashion", page_icon="📊", layo
 st.markdown("""
 <style>
     /* ---- ESTILOS VISUALES PARA LA PANTALLA EN VIVO ---- */
-    /* Color de los títulos principales */
     h1, h2, h3 {
         color: #002e5d !important;
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     }
     
-    /* Personalización del botón de ejecutar con el azul marino corporativo */
     div.stButton > button:first-child {
         background-color: #002e5d !important;
         color: white !important;
@@ -167,29 +165,31 @@ if archivo_carga:
                         if t_faltas > 0 and t_sobras > 0:
                             total_uds_cruces_talla += min(t_faltas, t_sobras)
 
-            total_desviacion_absoluta = df['Desviacion_Absoluta'].sum()
-            
-            # --- NUEVA LÓGICA SOLICITADA: DESGLOSE DE LOST, FOUND Y SIN AJUSTES ---
-            # 1. Calculamos los totales brutos de faltas y sobras
+            # --- CORRECCIÓN MATEMÁTICA COHERENTE (BASE 100% SOBRE TOTAL AUDITADO) ---
+            # 1. Totales de faltas y sobras absolutas
             total_faltas_brutas = abs(df[df['Diferencia_Uds'] < 0]['Diferencia_Uds'].sum())
             total_sobras_brutas = df[df['Diferencia_Uds'] > 0]['Diferencia_Uds'].sum()
             
-            # 2. Descontamos los cruces y reubicaciones de forma equitativa (1 unidad de cruce descuenta 1 falta y 1 sobra)
+            # 2. Descuento neto de cruces y reubicaciones sobre las faltas y sobras
             uds_lost_puro = max(0, total_faltas_brutas - total_uds_reubicadas - total_uds_cruces_talla)
             uds_found_puro = max(0, total_sobras_brutas - total_uds_reubicadas - total_uds_cruces_talla)
             
-            # 3. Porcentaje de líneas que están perfectas de origen (Sin Ajustes)
-            lineas_sin_ajuste = len(df[df['Diferencia_Uds'] == 0])
-            pct_sin_ajustes = (lineas_sin_ajuste / len(df)) * 100 if len(df) > 0 else 0.0
+            # 3. Unidades del sistema originales y cálculo de unidades que vinieron Perfectas (Sin Ajustes)
+            total_unidades_esperadas = df[col_expected].sum()
+            uds_sin_ajustes = max(0, total_unidades_esperadas - total_faltas_brutas)
             
-            # 4. Cálculo de porcentajes sobre la desviación absoluta total
-            if total_desviacion_absoluta > 0:
-                pct_reubicados = ((total_uds_reubicadas * 2) / total_desviacion_absoluta) * 100
-                pct_tallas = ((total_uds_cruces_talla * 2) / total_desviacion_absoluta) * 100
-                pct_lost = (uds_lost_puro / total_desviacion_absoluta) * 100
-                pct_found = (uds_found_puro / total_desviacion_absoluta) * 100
+            # 4. Definición del Universo Total Auditado (Esperadas del sistema + Sobras de mercancía no registrada)
+            universo_total_unidades = total_unidades_esperadas + uds_found_puro
+            
+            # 5. Cálculo de porcentajes bajo la misma base unificada
+            if universo_total_unidades > 0:
+                pct_sin_ajustes = (uds_sin_ajustes / universo_total_unidades) * 100
+                pct_reubicados = (total_uds_reubicadas / universo_total_unidades) * 100
+                pct_tallas = (total_uds_cruces_talla / universo_total_unidades) * 100
+                pct_lost = (uds_lost_puro / universo_total_unidades) * 100
+                pct_found = (uds_found_puro / universo_total_unidades) * 100
             else:
-                pct_reubicados, pct_tallas, pct_lost, pct_found = 0.0, 0.0, 0.0, 0.0
+                pct_sin_ajustes, pct_reubicados, pct_tallas, pct_lost, pct_found = 0.0, 0.0, 0.0, 0.0, 0.0
 
             # --- SECCIÓN 1: MÉTRICAS CLAVE ---
             st.write("---")
@@ -197,20 +197,23 @@ if archivo_carga:
             m1, m2, m3, m4 = st.columns(4)
             
             m1.metric("Total SKU Analizados", f"{len(df[sku_col].unique()):,}")
-            m2.metric("Total Unidades Esperadas", f"{int(df[col_expected].sum()):,}")
+            m2.metric("Total Unidades Esperadas", f"{int(total_unidades_esperadas):,}")
             m3.metric("Total Unidades Consolidadas", f"{int(df['Total_Real_Leido'].sum()):,}")
             
             descuadre_neto = int(df['Diferencia_Uds'].sum())
             m4.metric("Diferencia Global Neto", f"{descuadre_neto:,}")
             
-            st.markdown("#### 🎯 Distribución e Impacto de los Errores Encontrados")
-            # Ampliamos a 5 columnas para incluir el nuevo desglose detallado
+            st.markdown("#### 🎯 Distribución e Impacto (Cierre exacto al 100%)")
             p1, p2, p3, p4, p5 = st.columns(5)
-            p1.metric("🔄 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
-            p2.metric("🏷️ Cruces de Talla", f"{pct_tallas:.1f}%")
-            p3.metric("📉 Lost (Faltas Puras)", f"{pct_lost:.1f}%")
-            p4.metric("📈 Found (Sobras Puras)", f"{pct_found:.1f}%")
-            p5.metric("✅ Sin Ajustes (Líneas OK)", f"{pct_sin_ajustes:.1f}%")
+            p1.metric("✅ Sin Ajustes (En su sitio)", f"{pct_sin_ajustes:.1f}%")
+            p2.metric("🔄 Mercancía Reubicada", f"{pct_reubicados:.1f}%")
+            p3.metric("🏷️ Cruces de Talla", f"{pct_tallas:.1f}%")
+            p4.metric("📉 Lost (Faltas Puras)", f"{pct_lost:.1f}%")
+            p5.metric("📈 Found (Sobras Puras)", f"{pct_found:.1f}%")
+            
+            # Mensaje informativo de verificación
+            suma_total_verificacion = pct_sin_ajustes + pct_reubicados + pct_tallas + pct_lost + pct_found
+            st.caption(f"💡 Base de auditoría unificada: `{int(universo_total_unidades):,}` unidades totales. Sumatorio de indicadores: `{suma_total_verificacion:.1f}%`.")
             
             # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
             st.write("---")
