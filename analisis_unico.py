@@ -72,7 +72,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("📊 Cuadro de Mando: Comparativa de Unidades (Lógica de Recuento)")
-st.markdown("Sube tu reporte de inventario. El sistema consolidará el Paso 1 y Paso 2 aplicando la regla de auditoría de Logisfashion.")
+st.markdown("Sube tu reporte de inventario. El sistema consolidará las fases aplicando las reglas de negocio de Logisfashion.")
 
 archivo_carga = st.file_uploader("Cargar Archivo de Inventario (Excel/CSV)", type=["xlsx", "csv"])
 
@@ -117,21 +117,39 @@ if archivo_carga:
             if tiene_pos:
                 df[pos_col] = df[pos_col].astype(str).str.strip().str.upper()
             
+            # --- TRATAMIENTO DE DATOS ---
             df[col_expected] = pd.to_numeric(df[col_expected], errors='coerce').fillna(0)
             df['Paso1_Num'] = pd.to_numeric(df[col_read_1], errors='coerce').fillna(0)
-            df['Paso2_Num'] = pd.to_numeric(df[col_read_2], errors='coerce').fillna(0)
             
-            # REGLA LOGÍSTICA DE RECUENTO REPASADO
+            # Conservamos los NaN del Paso 2 para evaluar la existencia de datos reales
+            df['Paso2_Raw'] = pd.to_numeric(df[col_read_2], errors='coerce')
+            df['Paso2_Num'] = df['Paso2_Raw'].fillna(0)
+            
+            # --- MATRIZ DE DECISIÓN LOGÍSTICA ---
             def calcular_total_leido(row):
-                if row['Paso2_Num'] > 0:
+                if not pd.isna(row['Paso2_Raw']):
                     return row['Paso2_Num']
-                return row['Paso1_Num']
+                else:
+                    if row['Paso1_Num'] == row[col_expected]:
+                        return row['Paso1_Num']
+                    else:
+                        return row[col_expected]
             
             df['Total_Real_Leido'] = df.apply(calcular_total_leido, axis=1)
             df['Diferencia_Uds'] = df['Total_Real_Leido'] - df[col_expected]
             df['Desviacion_Absoluta'] = df['Diferencia_Uds'].abs()
             
-            # --- ALGORITMOS DE CLASIFICACIÓN DE ERROR ---
+            # --- DETECCIÓN ESPECÍFICA DE ERRORES DE AUDITORÍA (Paso 1 con diff sin Paso 2) ---
+            df['Error_Proceso_Falta_Paso2'] = (df['Paso1_Num'] != df[col_expected]) & (pd.isna(df['Paso2_Raw']))
+            # Unidades que estaban en disputa en el Paso 1 pero que se ignoraron por falta de Paso 2
+            df['Uds_En_Disputa_Ignoradas'] = df.apply(
+                lambda r: abs(r['Paso1_Num'] - r[col_expected]) if r['Error_Proceso_Falta_Paso2'] else 0, axis=1
+            )
+            
+            total_skus_con_error = df[df['Error_Proceso_Falta_Paso2']][sku_col].nunique()
+            total_uds_con_error = df['Uds_En_Disputa_Ignoradas'].sum()
+            
+            # --- ALGORITMOS DE CLASIFICACIÓN DE ERROR EN INVENTARIO ---
             total_uds_reubicadas = 0
             total_uds_cruces_talla = 0
             
@@ -165,31 +183,27 @@ if archivo_carga:
                         if t_faltas > 0 and t_sobras > 0:
                             total_uds_cruces_talla += min(t_faltas, t_sobras)
 
-            # --- CORRECCIÓN MATEMÁTICA COHERENTE (BASE 100% SOBRE TOTAL AUDITADO) ---
-            # 1. Totales de faltas y sobras absolutas
+            # --- MATEMÁTICA DE CIERRE AL 100% ---
             total_faltas_brutas = abs(df[df['Diferencia_Uds'] < 0]['Diferencia_Uds'].sum())
             total_sobras_brutas = df[df['Diferencia_Uds'] > 0]['Diferencia_Uds'].sum()
             
-            # 2. Descuento neto de cruces y reubicaciones sobre las faltas y sobras
             uds_lost_puro = max(0, total_faltas_brutas - total_uds_reubicadas - total_uds_cruces_talla)
             uds_found_puro = max(0, total_sobras_brutas - total_uds_reubicadas - total_uds_cruces_talla)
             
-            # 3. Unidades del sistema originales y cálculo de unidades que vinieron Perfectas (Sin Ajustes)
             total_unidades_esperadas = df[col_expected].sum()
             uds_sin_ajustes = max(0, total_unidades_esperadas - total_faltas_brutas)
             
-            # 4. Definición del Universo Total Auditado (Esperadas del sistema + Sobras de mercancía no registrada)
             universo_total_unidades = total_unidades_esperadas + uds_found_puro
             
-            # 5. Cálculo de porcentajes bajo la misma base unificada
             if universo_total_unidades > 0:
                 pct_sin_ajustes = (uds_sin_ajustes / universo_total_unidades) * 100
                 pct_reubicados = (total_uds_reubicadas / universo_total_unidades) * 100
                 pct_tallas = (total_uds_cruces_talla / universo_total_unidades) * 100
                 pct_lost = (uds_lost_puro / universo_total_unidades) * 100
                 pct_found = (uds_found_puro / universo_total_unidades) * 100
+                pct_global_error_proceso = (total_uds_con_error / universo_total_unidades) * 100
             else:
-                pct_sin_ajustes, pct_reubicados, pct_tallas, pct_lost, pct_found = 0.0, 0.0, 0.0, 0.0, 0.0
+                pct_sin_ajustes, pct_reubicados, pct_tallas, pct_lost, pct_found, pct_global_error_proceso = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
 
             # --- SECCIÓN 1: MÉTRICAS CLAVE ---
             st.write("---")
@@ -211,11 +225,31 @@ if archivo_carga:
             p4.metric("📉 Lost (Faltas Puras)", f"{pct_lost:.1f}%")
             p5.metric("📈 Found (Sobras Puras)", f"{pct_found:.1f}%")
             
-            # Mensaje informativo de verificación
             suma_total_verificacion = pct_sin_ajustes + pct_reubicados + pct_tallas + pct_lost + pct_found
             st.caption(f"💡 Base de auditoría unificada: `{int(universo_total_unidades):,}` unidades totales. Sumatorio de indicadores: `{suma_total_verificacion:.1f}%`.")
             
-            # --- SECCIÓN 2: GRÁFICOS CON LOS COLORES AJUSTADOS ---
+            # --- NUEVA SECCIÓN: CONTROL DE CALIDAD OPERATIVO ---
+            st.write("---")
+            st.markdown("### ⚠️ Control de Calidad de Auditoría (Errores de Proceso)")
+            
+            if total_uds_con_error > 0:
+                st.error(f"Se han detectado líneas donde el Paso 1 tenía diferencias pero **no se realizó el Paso 2 obligatorio**.")
+                
+                err_col1, err_col2, err_col3 = st.columns(3)
+                err_col1.metric("SKUs Afectados por el Fallo", f"{total_skus_con_error:,}")
+                err_col2.metric("Unidades en Disputa Ignoradas", f"{int(total_uds_con_error):,} uds")
+                err_col3.metric("% Impacto s/ Total Auditado", f"{pct_global_error_proceso:.2f}%")
+                
+                with st.expander("🔍 Ver desglose de líneas con Auditoría Incompleta (Requieren atención)"):
+                    df_lineas_error = df[df['Error_Proceso_Falta_Paso2']].copy()
+                    cols_mostrar_err = [sku_col]
+                    if tiene_pos: cols_mostrar_err.append(pos_col)
+                    cols_mostrar_err += [col_expected, col_read_1, col_read_2, 'Uds_En_Disputa_Ignoradas']
+                    st.dataframe(df_lineas_error[cols_mostrar_err], use_container_width=True)
+            else:
+                st.success("🎉 ¡Excelente disciplina de conteo! No hay ningún SKU con diferencias en Paso 1 que se haya quedado sin revisar en Paso 2.")
+
+            # --- SECCIÓN 2: GRÁFICOS ---
             st.write("---")
             st.subheader("🔥 Análisis de Variaciones Línea a Línea")
             col_g1, col_g2 = st.columns(2)
@@ -314,7 +348,7 @@ if archivo_carga:
             if tiene_pos: cols_prioritarias.append(pos_col)
             cols_prioritarias += [col_expected, col_read_1, col_read_2, 'Total_Real_Leido', 'Diferencia_Uds']
             
-            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c not in ['Desviacion_Absoluta', 'Raiz_Modelo', 'Paso1_Num', 'Paso2_Num']]
+            resto_columnas = [c for c in df.columns if c not in cols_prioritarias and c not in ['Desviacion_Absoluta', 'Raiz_Modelo', 'Paso1_Num', 'Paso2_Num', 'Paso2_Raw', 'Error_Proceso_Falta_Paso2', 'Uds_En_Disputa_Ignoradas']]
             df_final = df[cols_prioritarias + resto_columnas]
             
             st.dataframe(df_final, use_container_width=True)
