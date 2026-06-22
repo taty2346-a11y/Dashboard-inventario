@@ -1,6 +1,6 @@
 import pandas as pd
 import streamlit as st
-import io  # Necesario para manejar la descarga en memoria de Excel
+import io
 
 # Configuración de página
 st.set_page_config(page_title="Auditoría Logisfashion", page_icon="📊", layout="wide")
@@ -28,7 +28,7 @@ if archivo_sistema and archivo_fisico:
     sku_sis = st.sidebar.selectbox("SKU (Archivo 1)", df_sis.columns)
     cant_sis = st.sidebar.selectbox("Unidades (Archivo 1)", df_sis.columns)
     
-    # Nueva opción: Selección de columna de estado anterior (LOST/FOUND)
+    # Selección de columna de estado anterior
     columnas_estado = ["(No evaluar estados)"] + list(df_sis.columns)
     estado_sis = st.sidebar.selectbox("Columna Estado Anterior - LOST/FOUND (Archivo 1)", columnas_estado)
     
@@ -49,7 +49,7 @@ if archivo_sistema and archivo_fisico:
             df_sis_clean[cant_sis] = pd.to_numeric(df_sis_clean[cant_sis], errors='coerce').fillna(0)
             df_fis_clean[cant_fis] = pd.to_numeric(df_fis_clean[cant_fis], errors='coerce').fillna(0)
             
-            # Unir tablas (Outer join para no perder SKUs de ningún lado)
+            # Unir tablas (Outer join)
             df_merge = pd.merge(
                 df_sis_clean,
                 df_fis_clean,
@@ -58,4 +58,51 @@ if archivo_sistema and archivo_fisico:
                 how='outer'
             ).fillna(0)
             
-            # Si un SKU solo existía en el físico, el SKU del sistema queda
+            # Consolidar SKU final de forma segura
+            df_merge['SKU_Final'] = df_merge[sku_sis].astype(str).replace('0', '')
+            df_merge.loc[df_merge['SKU_Final'] == '', 'SKU_Final'] = df_merge[sku_fis]
+            
+            # Calcular diferencia
+            df_merge['Diferencia'] = df_merge[cant_fis] - df_merge[cant_sis]
+            
+            # Lógica de Control de Errores Corregidos (LOST / FOUND)
+            if estado_sis != "(No evaluar estados)":
+                def analizar_correccion(row):
+                    estado_previo = str(row[estado_sis]).upper().strip()
+                    dif_actual = row['Diferencia']
+                    
+                    if "LOST" in estado_previo:
+                        return "🟢 Corregido (Era LOST, ahora cuadrado)" if dif_actual == 0 else "🔴 Error Persiste (Sigue con descuadre)"
+                    elif "FOUND" in estado_previo:
+                        return "🟢 Corregido (Era FOUND, ahora cuadrado)" if dif_actual == 0 else "🔴 Error Persiste (Sigue con descuadre)"
+                    return "⚪ Sin Incidencia Previa"
+                
+                df_merge['Auditoría Estados'] = df_merge.apply(analizar_correccion, axis=1)
+            
+            # Reorganizar columnas
+            columnas_finales = ['SKU_Final', cant_sis, cant_fis, 'Diferencia']
+            if estado_sis != "(No evaluar estados)":
+                columnas_finales.insert(1, estado_sis)
+                columnas_finales.append('Auditoría Estados')
+                
+            df_resultado = df_merge[columnas_finales].copy()
+            
+            # Mostrar resultados en la app
+            st.subheader("📋 Resultados de la Auditoría")
+            st.dataframe(df_resultado, use_container_width=True)
+            
+            # Conversión y Descarga en formato EXCEL (.xlsx)
+            buffer = io.BytesIO()
+            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                df_resultado.to_excel(writer, index=False, sheet_name='Diferencias_Inventario')
+            buffer.seek(0)
+            
+            st.download_button(
+                label="📥 Descargar Comparativa en Excel (.xlsx)",
+                data=buffer,
+                file_name="resultado_auditoria_inventario.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
+        except Exception as e:
+            st.error(f"Error técnico: {e}. Asegúrate de que las columnas de cantidades contengan datos numéricos.")
