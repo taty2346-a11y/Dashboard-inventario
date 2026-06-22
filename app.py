@@ -9,9 +9,9 @@ st.title("📊 Control de Diferencias e Historial de Inventario")
 # Carga de dos archivos
 col1, col2 = st.columns(2)
 with col1:
-    archivo_sistema = st.file_uploader("1. Cargar Stock Cliente / Inventario Anterior (Excel/CSV)", type=["xlsx", "csv"])
+    archivo_sistema = st.file_uploader("1. Cargar Conteo / Anterior Inventario (Excel/CSV)", type=["xlsx", "csv"])
 with col2:
-    archivo_fisico = st.file_uploader("2. Cargar Conteo Nuevo / Logisfashion (Excel/CSV)", type=["xlsx", "csv"])
+    archivo_fisico = st.file_uploader("2. Cargar Conteo Nuevo / Nuevo Inventario (Excel/CSV)", type=["xlsx", "csv"])
 
 if archivo_sistema and archivo_fisico:
     # Leer archivos
