@@ -165,9 +165,9 @@ if archivo:
 
     st.dataframe(resumen_real, use_container_width=True)
 
-    # --- CRUCES DE TALLAS CON COMPENSACIÓN EXACTA ---
+    # --- CRUCES DE TALLAS DETALLADOS EN UNA SOLA COLUMNA ---
     st.write("---")
-    st.subheader("🏷️ Cruces de Variantes (compensación exacta y restante)")
+    st.subheader("🏷️ Cruces de Variantes (detalle por talla con LOST / FOUND / OK)")
 
     cruces_final = []
 
@@ -175,28 +175,27 @@ if archivo:
 
         if grupo["SKU"].nunique() > 1:
 
-            total_modelo = grupo["Diferencia"].sum()
+            tallas_detalle = []
 
-            grupo["LOST"] = grupo["Diferencia"].apply(lambda x: abs(x) if x < 0 else 0)
-            grupo["FOUND"] = grupo["Diferencia"].apply(lambda x: x if x > 0 else 0)
+            for _, row in grupo.iterrows():
 
-            lost_total = int(grupo["LOST"].sum())
-            found_total = int(grupo["FOUND"].sum())
-            resto = int(total_modelo)
+                dif = row["Diferencia"]
 
-            detalle = ", ".join(
-                f"{row['SKU']} (Dif: {row['Diferencia']})"
-                for _, row in grupo.iterrows()
-            )
+                if dif < 0:
+                    estado = f"LOST {abs(dif)}"
+                elif dif > 0:
+                    estado = f"FOUND {dif}"
+                else:
+                    estado = "OK (no reubicado)"
+
+                tallas_detalle.append(
+                    f"{row['SKU']} → Dif: {dif}, {estado}"
+                )
 
             cruces_final.append({
                 "Ubicación": ubic,
                 "Modelo": raiz,
-                "Tallas involucradas": detalle,
-                "LOST total": lost_total,
-                "FOUND total": found_total,
-                "RESTO (diferencia neta)": resto,
-                "Resultado": "Compensado" if resto == 0 else ("LOST" if resto < 0 else "FOUND")
+                "Tallas involucradas": "; ".join(tallas_detalle)
             })
 
     df_cruces_final = pd.DataFrame(cruces_final)
@@ -233,7 +232,7 @@ if archivo:
         df.to_excel(writer, index=False, sheet_name="Inventario")
         resumen_bruto.to_excel(writer, index=False, sheet_name="Diferencias Brutas")
         resumen_real.to_excel(writer, index=False, sheet_name="Diferencias Reales")
-        df_cruces_final.to_excel(writer, index=False, sheet_name="Cruces Compensados")
+        df_cruces_final.to_excel(writer, index=False, sheet_name="Cruces Detallados")
 
     excel_data = output.getvalue()
 
