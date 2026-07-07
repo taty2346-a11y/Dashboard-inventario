@@ -1,6 +1,7 @@
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import io
 
 st.set_page_config(page_title="Inventario", page_icon="📊", layout="wide")
 
@@ -55,8 +56,6 @@ if archivo:
         df["SKU"].isin(reubicados_skus)
         | df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)
     )
-
-    mov_df = df[mov_mask]
 
     # --- NUEVA LÓGICA DE LOST / FOUND REALES ---
     # Diferencia neta por SKU (incluye reubicados y cruces)
@@ -241,10 +240,18 @@ if archivo:
     st.subheader("📋 Reporte Completo")
     st.dataframe(df, use_container_width=True)
 
-    csv = df.to_csv(index=False).encode("utf-8")
+    # DESCARGA EN EXCEL
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="Inventario")
+        resumen_bruto.to_excel(writer, index=False, sheet_name="Diferencias Brutas")
+        resumen_real.to_excel(writer, index=False, sheet_name="Diferencias Reales")
+
+    excel_data = output.getvalue()
+
     st.download_button(
-        label="💾 Descargar Reporte",
-        data=csv,
-        file_name="reporte_inventario.csv",
-        mime="text/csv",
+        label="💾 Descargar Excel",
+        data=excel_data,
+        file_name="reporte_inventario.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
