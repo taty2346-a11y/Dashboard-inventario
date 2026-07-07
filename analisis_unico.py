@@ -181,28 +181,16 @@ if archivo:
         df_restantes = pd.DataFrame(restantes)
         resumen_real = pd.concat([resumen_real, df_restantes], ignore_index=True)
 
-    # PANEL PORCENTAJES (SUMANDO RESTOS A LOST/FOUND)
+    # PANEL PORCENTAJES (sin sumar RESTOS)
     st.write("---")
     st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
 
-    # Calcular LOST y FOUND de los RESTOS
-    lost_restos = sum(r["Diferencia_Total"] for r in restantes if r["Diferencia_Total"] < 0)
-    found_restos = sum(r["Diferencia_Total"] for r in restantes if r["Diferencia_Total"] > 0)
-
-    # LOST y FOUND corregidos
-    lost_real_units_corr = lost_real_units + abs(lost_restos)
-    found_real_units_corr = found_real_units + found_restos
-
-    pct_lost_real_corr = round((lost_real_units_corr / total_unidades) * 100, 2)
-    pct_found_real_corr = round((found_real_units_corr / total_unidades) * 100, 2)
-
-    # Cruces y reubicados NO se corrigen (solo compensados)
     c1, c2, c3, c4, c5 = st.columns(5)
 
-    c1.metric("LOST reales", f"{pct_lost_real_corr}% | {lost_real_units_corr} uds")
-    c2.metric("FOUND reales", f"{pct_found_real_corr}% | {found_real_units_corr} uds")
-    c3.metric("Reubicados (compensados)", f"{pct_reubicados}% | {reubicados_units} uds")
-    c4.metric("Cruces de talla (compensados)", f"{pct_cruces_talla}% | {cruces_units} uds")
+    c1.metric("LOST reales", f"{pct_lost_real}% | {lost_real_units} uds")
+    c2.metric("FOUND reales", f"{pct_found_real}% | {found_real_units} uds")
+    c3.metric("Reubicados", f"{pct_reubicados}% | {reubicados_units} uds")
+    c4.metric("Cruces de tallas", f"{pct_cruces_talla}% | {cruces_units} uds")
     c5.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
 
     # Mostrar cruces y reubicados compensados
