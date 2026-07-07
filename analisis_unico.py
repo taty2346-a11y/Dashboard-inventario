@@ -47,19 +47,12 @@ if archivo:
 
     # CRUCES DE TALLAS (mismo modelo)
     df["Raiz"] = df["SKU"].apply(lambda x: str(x).split("-")[0])
-    cruces_talla = df.groupby(["Ubicacion", "Raiz"])["SKU"].nunique()
-    cruces_detectados = cruces_talla[cruces_talla > 1]
-    cruces_index = cruces_detectados.index
 
-    # --- NUEVA LÓGICA DE LOST / FOUND REALES ---
+    # --- DIFERENCIAS REALES POR SKU ---
     sku_diff = df.groupby("SKU")["Diferencia"].sum()
 
     lost_real_units = int(sku_diff[sku_diff < 0].abs().sum())
     found_real_units = int(sku_diff[sku_diff > 0].sum())
-
-    # Unidades informativas
-    reubicados_units = int(df[df["SKU"].isin(reubicados_skus)]["Dif_Abs"].sum())
-    cruces_units = int(df[df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)]["Dif_Abs"].sum())
 
     # SKU sin diferencia
     ok_items = df[df["Diferencia"] == 0]
@@ -69,12 +62,9 @@ if archivo:
     # Porcentajes
     pct_lost_real = round((lost_real_units / total_unidades) * 100, 2)
     pct_found_real = round((found_real_units / total_unidades) * 100, 2)
-    pct_reubicados = round((reubicados_units / total_unidades) * 100, 2)
-    pct_cruces_talla = round((cruces_units / total_unidades) * 100, 2)
     pct_ok_units = round((ok_units / total_unidades) * 100, 2)
 
     diferencia_neta_real = found_real_units - lost_real_units
-    diferencia_neta_bruta = found_raw_units - lost_raw_units
 
     # Salud inventario
     if diferencia_neta_real == 0:
@@ -91,49 +81,10 @@ if archivo:
     st.write("---")
     st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3 = st.columns(3)
     c1.metric("LOST reales", f"{pct_lost_real}% | {lost_real_units} uds")
     c2.metric("FOUND reales", f"{pct_found_real}% | {found_real_units} uds")
-    c3.metric("Reubicados", f"{pct_reubicados}% | {reubicados_units} uds")
-    c4.metric("Cruces de tallas", f"{pct_cruces_talla}% | {cruces_units} uds")
-    c5.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
-
-    # RESUMEN GENERAL
-    st.write("---")
-    st.subheader("📌 Resumen General")
-
-    m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
-
-    m1.metric("Total SKU", df["SKU"].nunique())
-    m2.metric("Unidades Sistema", int(df["Sistema"].sum()))
-    m3.metric("Unidades Físico", int(df["Fisico"].sum()))
-    m4.metric("LOST bruto", f"{lost_raw_units} uds")
-    m5.metric("FOUND bruto", f"{found_raw_units} uds")
-    m6.metric("Diferencia neta bruta", f"{diferencia_neta_bruta} uds")
-    m7.metric("Salud inventario", salud, color_salud)
-
-    # GRÁFICO CIRCULAR
-    st.write("---")
-    st.subheader("📊 Distribución de estados del inventario")
-
-    pie_df = pd.DataFrame({
-        "Categoria": ["LOST reales", "FOUND reales", "Reubicados", "Cruces de talla", "OK"],
-        "Unidades": [
-            lost_real_units,
-            found_real_units,
-            reubicados_units,
-            cruces_units,
-            ok_units
-        ]
-    })
-
-    fig_pie = px.pie(
-        pie_df,
-        names="Categoria",
-        values="Unidades",
-        title="Distribución de unidades por tipo de diferencia",
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+    c3.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
 
     # DIFERENCIAS BRUTAS
     st.write("---")
@@ -165,7 +116,7 @@ if archivo:
 
     st.dataframe(resumen_real, use_container_width=True)
 
-    # --- CRUCES DE TALLAS DETALLADOS (solo si hay diferencias y compensando) ---
+    # --- CRUCES DE TALLAS (solo SKU con diferencias y compensación lógica) ---
     st.write("---")
     st.subheader("🏷️ Cruces de Variantes (solo si hay diferencias reales)")
 
@@ -176,24 +127,24 @@ if archivo:
         # Solo si hay más de una talla del mismo modelo
         if grupo["SKU"].nunique() > 1:
 
-            # Diferencias por talla
-            difs = grupo["Diferencia"].tolist()
+            # Filtrar solo tallas con diferencias
+            grupo_dif = grupo[grupo["Diferencia"] != 0]
 
-            # Si todas las tallas tienen Dif = 0 → NO es cruce
-            if all(d == 0 for d in difs):
+            # Si NO hay tallas con diferencia → NO es cruce
+            if grupo_dif.empty:
                 continue
 
             # Diferencia neta del modelo (compensación)
-            resto = sum(difs)
+            resto = grupo_dif["Diferencia"].sum()
 
             # Si el modelo se compensa completamente → NO es cruce
             if resto == 0:
                 continue
 
-            # Si NO se compensa → mostrar tallas involucradas (pero NO el restante)
+            # Si NO se compensa → mostrar SOLO tallas con diferencia
             tallas_detalle = []
 
-            for _, row in grupo.iterrows():
+            for _, row in grupo_dif.iterrows():
 
                 dif = row["Diferencia"]
 
