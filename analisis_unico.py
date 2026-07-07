@@ -165,9 +165,9 @@ if archivo:
 
     st.dataframe(resumen_real, use_container_width=True)
 
-    # --- CRUCES DE TALLAS DETALLADOS (solo si hay diferencias) ---
+    # --- CRUCES DE TALLAS DETALLADOS (solo si hay diferencias y compensando) ---
     st.write("---")
-    st.subheader("🏷️ Cruces de Variantes (solo si hay diferencias)")
+    st.subheader("🏷️ Cruces de Variantes (solo si hay diferencias reales)")
 
     cruces_final = []
 
@@ -176,38 +176,50 @@ if archivo:
         # Solo si hay más de una talla del mismo modelo
         if grupo["SKU"].nunique() > 1:
 
-            # Solo si alguna talla tiene diferencia ≠ 0
-            if (grupo["Diferencia"] != 0).any():
+            # Diferencias por talla
+            difs = grupo["Diferencia"].tolist()
 
-                tallas_detalle = []
+            # Si todas las tallas tienen Dif = 0 → NO es cruce
+            if all(d == 0 for d in difs):
+                continue
 
-                for _, row in grupo.iterrows():
+            # Diferencia neta del modelo (compensación)
+            resto = sum(difs)
 
-                    dif = row["Diferencia"]
+            # Si el modelo se compensa completamente → NO es cruce
+            if resto == 0:
+                continue
 
-                    if dif < 0:
-                        estado = f"LOST {abs(dif)}"
-                    elif dif > 0:
-                        estado = f"FOUND {dif}"
-                    else:
-                        estado = "OK (no reubicado)"
+            # Si NO se compensa → mostrar tallas involucradas (pero NO el restante)
+            tallas_detalle = []
 
-                    tallas_detalle.append(
-                        f"{row['SKU']} → Dif: {dif}, {estado}"
-                    )
+            for _, row in grupo.iterrows():
 
-                cruces_final.append({
-                    "Ubicación": ubic,
-                    "Modelo": raiz,
-                    "Tallas involucradas": "; ".join(tallas_detalle)
-                })
+                dif = row["Diferencia"]
+
+                if dif < 0:
+                    estado = f"LOST {abs(dif)}"
+                elif dif > 0:
+                    estado = f"FOUND {dif}"
+                else:
+                    estado = "OK (no reubicado)"
+
+                tallas_detalle.append(
+                    f"{row['SKU']} → Dif: {dif}, {estado}"
+                )
+
+            cruces_final.append({
+                "Ubicación": ubic,
+                "Modelo": raiz,
+                "Tallas involucradas": "; ".join(tallas_detalle)
+            })
 
     df_cruces_final = pd.DataFrame(cruces_final)
 
     if not df_cruces_final.empty:
         st.dataframe(df_cruces_final, use_container_width=True)
     else:
-        st.info("No se detectaron cruces de talla con diferencias.")
+        st.info("No se detectaron cruces de talla con diferencias reales.")
 
     # ZONAS CRÍTICAS
     st.write("---")
