@@ -171,40 +171,27 @@ if archivo:
 
     st.dataframe(resumen_real, use_container_width=True)
 
-    # REUBICACIONES
+    # --- CRUCES DE TALLAS DETALLADOS ---
     st.write("---")
-    st.subheader("🔄 Reubicaciones Internas")
-
-    reubicaciones = []
-    for sku, grupo in df.groupby("SKU"):
-        if grupo["Ubicacion"].nunique() > 1:
-            reubicaciones.append({
-                "SKU": sku,
-                "Ubicaciones": ", ".join(sorted(grupo["Ubicacion"].unique())),
-                "Total Sistema": grupo["Sistema"].sum(),
-                "Total Físico": grupo["Fisico"].sum()
-            })
-
-    if reubicaciones:
-        st.dataframe(pd.DataFrame(reubicaciones), use_container_width=True)
-    else:
-        st.info("No se detectaron reubicaciones internas.")
-
-    # CRUCES DE TALLAS
-    st.write("---")
-    st.subheader("🏷️ Cruces de Variantes")
+    st.subheader("🏷️ Cruces de Variantes (con LOST/FOUND por SKU)")
 
     cruces = []
+
     for (ubic, raiz), grupo in df.groupby(["Ubicacion", "Raiz"]):
         if grupo["SKU"].nunique() > 1:
+
             detalle = ", ".join(
-                f"{row['SKU']} ({row['Fisico']})"
+                f"{row['SKU']} (Dif: {row['Diferencia']})"
                 for _, row in grupo.iterrows()
             )
+
             cruces.append({
                 "Ubicación": ubic,
-                "Artículo Base": raiz,
-                "Variantes": detalle
+                "Modelo": raiz,
+                "SKU involucrados": detalle,
+                "SKU positivos (FOUND)": ", ".join(grupo[grupo["Diferencia"] > 0]["SKU"]),
+                "SKU negativos (LOST)": ", ".join(grupo[grupo["Diferencia"] < 0]["SKU"]),
+                "SKU compensados": ", ".join(grupo[grupo["Diferencia"] == 0]["SKU"])
             })
 
     if cruces:
@@ -239,6 +226,7 @@ if archivo:
         df.to_excel(writer, index=False, sheet_name="Inventario")
         resumen_bruto.to_excel(writer, index=False, sheet_name="Diferencias Brutas")
         resumen_real.to_excel(writer, index=False, sheet_name="Diferencias Reales")
+        pd.DataFrame(cruces).to_excel(writer, index=False, sheet_name="Cruces de Talla")
 
     excel_data = output.getvalue()
 
