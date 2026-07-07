@@ -41,14 +41,14 @@ if archivo:
     lost_raw_units = int(df[df["Diferencia"] < 0]["Diferencia"].abs().sum())
     found_raw_units = int(df[df["Diferencia"] > 0]["Diferencia"].sum())
 
-    # REUBICADOS (solo informativo)
+    # REUBICADOS
     reubicados = df.groupby("SKU")["Ubicacion"].nunique()
     reubicados_skus = reubicados[reubicados > 1].index
 
     # Raíz del modelo
     df["Raiz"] = df["SKU"].apply(lambda x: str(x).split("-")[0])
 
-    # --- NUEVA LÓGICA DE LOST / FOUND REALES ---
+    # --- LOST / FOUND reales por SKU ---
     sku_diff = df.groupby("SKU")["Diferencia"].sum()
 
     lost_real_units = int(sku_diff[sku_diff < 0].abs().sum())
@@ -86,7 +86,37 @@ if archivo:
     c2.metric("FOUND reales", f"{pct_found_real}% | {found_real_units} uds")
     c3.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
 
-    # --- CRUCES DE TALLAS DETALLADOS (sin tener en cuenta la posición) ---
+    # DIFERENCIAS BRUTAS
+    st.write("---")
+    st.subheader("📦 Diferencias por SKU (brutas)")
+
+    resumen_bruto = df.groupby("SKU").agg(
+        Sistema_Total=("Sistema", "sum"),
+        Fisico_Total=("Fisico", "sum"),
+        Diferencia_Total=("Diferencia", "sum"),
+        Diferencia_Absoluta=("Dif_Abs", "sum"),
+        Ubicaciones=("Ubicacion", lambda x: ", ".join(sorted(x.unique())))
+    ).reset_index()
+
+    st.dataframe(resumen_bruto, use_container_width=True)
+
+    # DIFERENCIAS REALES
+    st.write("---")
+    st.subheader("📦 Diferencias por SKU (reales)")
+
+    df_real = df[df["SKU"].isin(sku_diff[sku_diff != 0].index)]
+
+    resumen_real = df_real.groupby("SKU").agg(
+        Sistema_Total=("Sistema", "sum"),
+        Fisico_Total=("Fisico", "sum"),
+        Diferencia_Total=("Diferencia", "sum"),
+        Diferencia_Absoluta=("Dif_Abs", "sum"),
+        Ubicaciones=("Ubicacion", lambda x: ", ".join(sorted(x.unique())))
+    ).reset_index()
+
+    st.dataframe(resumen_real, use_container_width=True)
+
+    # --- CRUCES DE TALLAS (solo si hay diferencias, sin tener en cuenta la posición) ---
     st.write("---")
     st.subheader("🏷️ Cruces de Variantes (solo si hay diferencias)")
 
@@ -129,10 +159,33 @@ if archivo:
     else:
         st.info("No se detectaron cruces de talla con diferencias.")
 
+    # ZONAS CRÍTICAS
+    st.write("---")
+    st.subheader("🔥 Zonas con Mayor Diferencia")
+
+    zonas = df.groupby("Ubicacion")["Dif_Abs"].sum().reset_index()
+
+    fig = px.bar(
+        zonas,
+        x="Ubicacion",
+        y="Dif_Abs",
+        title="Diferencias por Ubicación",
+        color="Dif_Abs",
+        color_continuous_scale="Reds"
+    )
+    st.plotly_chart(fig, use_container_width=True)
+
+    # REPORTE COMPLETO
+    st.write("---")
+    st.subheader("📋 Reporte Completo")
+    st.dataframe(df, use_container_width=True)
+
     # DESCARGA EN EXCEL
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Inventario")
+        resumen_bruto.to_excel(writer, index=False, sheet_name="Diferencias Brutas")
+        resumen_real.to_excel(writer, index=False, sheet_name="Diferencias Reales")
         df_cruces_final.to_excel(writer, index=False, sheet_name="Cruces Detallados")
 
     excel_data = output.getvalue()
