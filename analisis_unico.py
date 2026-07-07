@@ -45,17 +45,11 @@ if archivo:
     reubicados = df.groupby("SKU")["Ubicacion"].nunique()
     reubicados_skus = reubicados[reubicados > 1].index
 
-    # CRUCES DE TALLAS
+    # CRUCES DE TALLAS (mismo modelo)
     df["Raiz"] = df["SKU"].apply(lambda x: str(x).split("-")[0])
     cruces_talla = df.groupby(["Ubicacion", "Raiz"])["SKU"].nunique()
     cruces_detectados = cruces_talla[cruces_talla > 1]
     cruces_index = cruces_detectados.index
-
-    # Filas que son movimiento
-    mov_mask = (
-        df["SKU"].isin(reubicados_skus)
-        | df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)
-    )
 
     # --- NUEVA LÓGICA DE LOST / FOUND REALES ---
     sku_diff = df.groupby("SKU")["Diferencia"].sum()
@@ -171,33 +165,46 @@ if archivo:
 
     st.dataframe(resumen_real, use_container_width=True)
 
-    # --- CRUCES DE TALLAS DETALLADOS (LOST / FOUND / RESTO) ---
+    # --- CRUCES DE TALLAS CON COMPENSACIÓN EXACTA ---
     st.write("---")
-    st.subheader("🏷️ Cruces de Variantes (LOST / FOUND / RESTO por talla)")
+    st.subheader("🏷️ Cruces de Variantes (compensación exacta y restante)")
 
-    cruces_detallados = []
+    cruces_final = []
 
     for (ubic, raiz), grupo in df.groupby(["Ubicacion", "Raiz"]):
+
         if grupo["SKU"].nunique() > 1:
 
-            for _, row in grupo.iterrows():
+            total_modelo = grupo["Diferencia"].sum()
 
-                cruces_detallados.append({
-                    "Ubicación": ubic,
-                    "Modelo": raiz,
-                    "SKU": row["SKU"],
-                    "Sistema": row["Sistema"],
-                    "Físico": row["Fisico"],
-                    "LOST": abs(row["Diferencia"]) if row["Diferencia"] < 0 else 0,
-                    "FOUND": row["Diferencia"] if row["Diferencia"] > 0 else 0,
-                    "RESTO": row["Diferencia"]
-                })
+            grupo["LOST"] = grupo["Diferencia"].apply(lambda x: abs(x) if x < 0 else 0)
+            grupo["FOUND"] = grupo["Diferencia"].apply(lambda x: x if x > 0 else 0)
 
-    if cruces_detallados:
-        df_cruces = pd.DataFrame(cruces_detallados)
-        st.dataframe(df_cruces, use_container_width=True)
+            lost_total = int(grupo["LOST"].sum())
+            found_total = int(grupo["FOUND"].sum())
+            resto = int(total_modelo)
+
+            detalle = ", ".join(
+                f"{row['SKU']} (Dif: {row['Diferencia']})"
+                for _, row in grupo.iterrows()
+            )
+
+            cruces_final.append({
+                "Ubicación": ubic,
+                "Modelo": raiz,
+                "Tallas involucradas": detalle,
+                "LOST total": lost_total,
+                "FOUND total": found_total,
+                "RESTO (diferencia neta)": resto,
+                "Resultado": "Compensado" if resto == 0 else ("LOST" if resto < 0 else "FOUND")
+            })
+
+    df_cruces_final = pd.DataFrame(cruces_final)
+
+    if not df_cruces_final.empty:
+        st.dataframe(df_cruces_final, use_container_width=True)
     else:
-        st.info("No se detectaron variantes mezcladas.")
+        st.info("No se detectaron cruces de talla.")
 
     # ZONAS CRÍTICAS
     st.write("---")
@@ -220,13 +227,13 @@ if archivo:
     st.subheader("📋 Reporte Completo")
     st.dataframe(df, use_container_width=True)
 
-    # DESCARGA EN EXCEL (openpyxl)
+    # DESCARGA EN EXCEL
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Inventario")
         resumen_bruto.to_excel(writer, index=False, sheet_name="Diferencias Brutas")
         resumen_real.to_excel(writer, index=False, sheet_name="Diferencias Reales")
-        df_cruces.to_excel(writer, index=False, sheet_name="Cruces de Talla")
+        df_cruces_final.to_excel(writer, index=False, sheet_name="Cruces Compensados")
 
     excel_data = output.getvalue()
 
