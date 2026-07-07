@@ -45,7 +45,7 @@ if archivo:
     reubicados = df.groupby("SKU")["Ubicacion"].nunique()
     reubicados_skus = reubicados[reubicados > 1].index
 
-    # CRUCES DE TALLAS (mismo modelo)
+    # Raíz del modelo
     df["Raiz"] = df["SKU"].apply(lambda x: str(x).split("-")[0])
 
     # --- DIFERENCIAS REALES POR SKU ---
@@ -114,13 +114,12 @@ if archivo:
         Ubicaciones=("Ubicacion", lambda x: ", ".join(sorted(x.unique())))
     ).reset_index()
 
-    st.dataframe(resumen_real, use_container_width=True)
-
     # --- CRUCES DE TALLAS (solo SKU con diferencias y compensación lógica) ---
     st.write("---")
     st.subheader("🏷️ Cruces de Variantes (solo si hay diferencias reales)")
 
     cruces_final = []
+    restantes_extra = []   # filas adicionales para resumen_real
 
     for (ubic, raiz), grupo in df.groupby(["Ubicacion", "Raiz"]):
 
@@ -141,7 +140,17 @@ if archivo:
             if resto == 0:
                 continue
 
-            # Si NO se compensa → mostrar SOLO tallas con diferencia
+            # Registrar el restante como fila adicional en diferencias reales
+            restantes_extra.append({
+                "SKU": f"{raiz}-RESTO",
+                "Sistema_Total": 0,
+                "Fisico_Total": 0,
+                "Diferencia_Total": resto,
+                "Diferencia_Absoluta": abs(resto),
+                "Ubicaciones": ubic
+            })
+
+            # Mostrar SOLO tallas con diferencia en cruces
             tallas_detalle = []
 
             for _, row in grupo_dif.iterrows():
@@ -167,10 +176,21 @@ if archivo:
 
     df_cruces_final = pd.DataFrame(cruces_final)
 
+    # Añadir los restantes al resumen_real
+    if restantes_extra:
+        df_restantes_extra = pd.DataFrame(restantes_extra)
+        resumen_real = pd.concat([resumen_real, df_restantes_extra], ignore_index=True)
+
+    # Mostrar cruces
     if not df_cruces_final.empty:
         st.dataframe(df_cruces_final, use_container_width=True)
     else:
         st.info("No se detectaron cruces de talla con diferencias reales.")
+
+    # Mostrar diferencias reales actualizadas
+    st.write("---")
+    st.subheader("📦 Diferencias por SKU (incluye RESTO por modelo)")
+    st.dataframe(resumen_real, use_container_width=True)
 
     # ZONAS CRÍTICAS
     st.write("---")
