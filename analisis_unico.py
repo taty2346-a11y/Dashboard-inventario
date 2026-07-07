@@ -49,29 +49,23 @@ if archivo:
     df["Raiz"] = df["SKU"].apply(lambda x: str(x).split("-")[0])
     cruces_talla = df.groupby(["Ubicacion", "Raiz"])["SKU"].nunique()
     cruces_detectados = cruces_talla[cruces_talla > 1]
-    cruces_index = cruces_detectados.index  # (Ubicacion, Raiz)
+    cruces_index = cruces_detectados.index
 
-    # Filas que son movimiento (reubicado o cruce de talla)
+    # Filas que son movimiento
     mov_mask = (
         df["SKU"].isin(reubicados_skus)
         | df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)
     )
 
     # --- NUEVA LÓGICA DE LOST / FOUND REALES ---
-    # Diferencia neta por SKU (incluye reubicados y cruces)
     sku_diff = df.groupby("SKU")["Diferencia"].sum()
 
-    # LOST real = suma de diferencias negativas netas
     lost_real_units = int(sku_diff[sku_diff < 0].abs().sum())
-
-    # FOUND real = suma de diferencias positivas netas
     found_real_units = int(sku_diff[sku_diff > 0].sum())
 
-    # Unidades en reubicados y cruces (solo informativas)
+    # Unidades informativas
     reubicados_units = int(df[df["SKU"].isin(reubicados_skus)]["Dif_Abs"].sum())
-    cruces_units = int(
-        df[df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)]["Dif_Abs"].sum()
-    )
+    cruces_units = int(df[df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)]["Dif_Abs"].sum())
 
     # SKU sin diferencia
     ok_items = df[df["Diferencia"] == 0]
@@ -85,7 +79,6 @@ if archivo:
     pct_cruces_talla = round((cruces_units / total_unidades) * 100, 2)
     pct_ok_units = round((ok_units / total_unidades) * 100, 2)
 
-    # Diferencias netas
     diferencia_neta_real = found_real_units - lost_real_units
     diferencia_neta_bruta = found_raw_units - lost_raw_units
 
@@ -148,9 +141,9 @@ if archivo:
     )
     st.plotly_chart(fig_pie, use_container_width=True)
 
-    # DIFERENCIAS POR SKU (BRUTAS)
+    # DIFERENCIAS BRUTAS
     st.write("---")
-    st.subheader("📦 Diferencias por SKU (brutas, contando reubicados y cambios de talla)")
+    st.subheader("📦 Diferencias por SKU (brutas)")
 
     resumen_bruto = df.groupby("SKU").agg(
         Sistema_Total=("Sistema", "sum"),
@@ -162,9 +155,9 @@ if archivo:
 
     st.dataframe(resumen_bruto, use_container_width=True)
 
-    # DIFERENCIAS POR SKU (REALES)
+    # DIFERENCIAS REALES
     st.write("---")
-    st.subheader("📦 Diferencias por SKU (reales, sin movimientos compensados)")
+    st.subheader("📦 Diferencias por SKU (reales)")
 
     df_real = df[df["SKU"].isin(sku_diff[sku_diff != 0].index)]
 
@@ -240,9 +233,9 @@ if archivo:
     st.subheader("📋 Reporte Completo")
     st.dataframe(df, use_container_width=True)
 
-    # DESCARGA EN EXCEL
+    # DESCARGA EN EXCEL (openpyxl)
     output = io.BytesIO()
-    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+    with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Inventario")
         resumen_bruto.to_excel(writer, index=False, sheet_name="Diferencias Brutas")
         resumen_real.to_excel(writer, index=False, sheet_name="Diferencias Reales")
