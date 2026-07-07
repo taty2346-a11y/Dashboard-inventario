@@ -37,6 +37,10 @@ if archivo:
         lambda x: "FOUND (Sobra)" if x > 0 else ("LOST (Falta)" if x < 0 else "OK")
     )
 
+    # LOST / FOUND brutos
+    lost_raw_units = int(df[df["Diferencia"] < 0]["Diferencia"].abs().sum())
+    found_raw_units = int(df[df["Diferencia"] > 0]["Diferencia"].sum())
+
     # REUBICADOS (SKU con varias ubicaciones)
     reubicados = df.groupby("SKU")["Ubicacion"].nunique()
     reubicados_skus = reubicados[reubicados > 1].index
@@ -125,7 +129,7 @@ if archivo:
 
     cruces_final = []
     reubicaciones_final = []
-    restantes = []  # <-- aquí guardamos los RESTOS agrupados por modelo
+    restantes = []  # <-- RESTOS agrupados por modelo
 
     # 1️⃣ CRUCES DE TALLA
     for (ubic, raiz), grupo in df.groupby(["Ubicacion", "Raiz"]):
@@ -150,7 +154,6 @@ if archivo:
                     "Tallas involucradas": detalle
                 })
             else:
-                # RESTO agrupado por modelo
                 restantes.append({
                     "Modelo": raiz,
                     "SKU": f"{raiz}-RESTO",
@@ -169,8 +172,7 @@ if archivo:
                 continue
 
             resto = grupo_dif["Diferencia"].sum()
-
-            raiz = sku.split("-")[0]  # <-- agrupamos por modelo
+            raiz = sku.split("-")[0]
 
             if resto == 0:
                 detalle = ", ".join(
