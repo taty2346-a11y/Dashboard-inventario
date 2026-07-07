@@ -165,45 +165,49 @@ if archivo:
 
     st.dataframe(resumen_real, use_container_width=True)
 
-    # --- CRUCES DE TALLAS DETALLADOS EN UNA SOLA COLUMNA ---
+    # --- CRUCES DE TALLAS DETALLADOS (solo si hay diferencias) ---
     st.write("---")
-    st.subheader("🏷️ Cruces de Variantes (detalle por talla con LOST / FOUND / OK)")
+    st.subheader("🏷️ Cruces de Variantes (solo si hay diferencias)")
 
     cruces_final = []
 
     for (ubic, raiz), grupo in df.groupby(["Ubicacion", "Raiz"]):
 
+        # Solo si hay más de una talla del mismo modelo
         if grupo["SKU"].nunique() > 1:
 
-            tallas_detalle = []
+            # Solo si alguna talla tiene diferencia ≠ 0
+            if (grupo["Diferencia"] != 0).any():
 
-            for _, row in grupo.iterrows():
+                tallas_detalle = []
 
-                dif = row["Diferencia"]
+                for _, row in grupo.iterrows():
 
-                if dif < 0:
-                    estado = f"LOST {abs(dif)}"
-                elif dif > 0:
-                    estado = f"FOUND {dif}"
-                else:
-                    estado = "OK (no reubicado)"
+                    dif = row["Diferencia"]
 
-                tallas_detalle.append(
-                    f"{row['SKU']} → Dif: {dif}, {estado}"
-                )
+                    if dif < 0:
+                        estado = f"LOST {abs(dif)}"
+                    elif dif > 0:
+                        estado = f"FOUND {dif}"
+                    else:
+                        estado = "OK (no reubicado)"
 
-            cruces_final.append({
-                "Ubicación": ubic,
-                "Modelo": raiz,
-                "Tallas involucradas": "; ".join(tallas_detalle)
-            })
+                    tallas_detalle.append(
+                        f"{row['SKU']} → Dif: {dif}, {estado}"
+                    )
+
+                cruces_final.append({
+                    "Ubicación": ubic,
+                    "Modelo": raiz,
+                    "Tallas involucradas": "; ".join(tallas_detalle)
+                })
 
     df_cruces_final = pd.DataFrame(cruces_final)
 
     if not df_cruces_final.empty:
         st.dataframe(df_cruces_final, use_container_width=True)
     else:
-        st.info("No se detectaron cruces de talla.")
+        st.info("No se detectaron cruces de talla con diferencias.")
 
     # ZONAS CRÍTICAS
     st.write("---")
