@@ -45,27 +45,14 @@ if archivo:
     reubicados = df.groupby("SKU")["Ubicacion"].nunique()
     reubicados_skus = reubicados[reubicados > 1].index
 
-    # CRUCES DE TALLAS
+    # Raíz del modelo
     df["Raiz"] = df["SKU"].apply(lambda x: str(x).split("-")[0])
-    cruces_talla = df.groupby(["Ubicacion", "Raiz"])["SKU"].nunique()
-    cruces_detectados = cruces_talla[cruces_talla > 1]
-    cruces_index = cruces_detectados.index
 
-    # Filas que son movimiento
-    mov_mask = (
-        df["SKU"].isin(reubicados_skus)
-        | df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)
-    )
-
-    # --- NUEVA LÓGICA DE LOST / FOUND REALES ---
+    # --- DIFERENCIAS REALES POR SKU ---
     sku_diff = df.groupby("SKU")["Diferencia"].sum()
 
     lost_real_units = int(sku_diff[sku_diff < 0].abs().sum())
     found_real_units = int(sku_diff[sku_diff > 0].sum())
-
-    # Unidades informativas
-    reubicados_units = int(df[df["SKU"].isin(reubicados_skus)]["Dif_Abs"].sum())
-    cruces_units = int(df[df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)]["Dif_Abs"].sum())
 
     # SKU sin diferencia
     ok_items = df[df["Diferencia"] == 0]
@@ -75,12 +62,9 @@ if archivo:
     # Porcentajes
     pct_lost_real = round((lost_real_units / total_unidades) * 100, 2)
     pct_found_real = round((found_real_units / total_unidades) * 100, 2)
-    pct_reubicados = round((reubicados_units / total_unidades) * 100, 2)
-    pct_cruces_talla = round((cruces_units / total_unidades) * 100, 2)
     pct_ok_units = round((ok_units / total_unidades) * 100, 2)
 
     diferencia_neta_real = found_real_units - lost_real_units
-    diferencia_neta_bruta = found_raw_units - lost_raw_units
 
     # Salud inventario
     if diferencia_neta_real == 0:
@@ -97,49 +81,10 @@ if archivo:
     st.write("---")
     st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
 
-    c1, c2, c3, c4, c5 = st.columns(5)
+    c1, c2, c3 = st.columns(3)
     c1.metric("LOST reales", f"{pct_lost_real}% | {lost_real_units} uds")
     c2.metric("FOUND reales", f"{pct_found_real}% | {found_real_units} uds")
-    c3.metric("Reubicados", f"{pct_reubicados}% | {reubicados_units} uds")
-    c4.metric("Cruces de tallas", f"{pct_cruces_talla}% | {cruces_units} uds")
-    c5.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
-
-    # RESUMEN GENERAL
-    st.write("---")
-    st.subheader("📌 Resumen General")
-
-    m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
-
-    m1.metric("Total SKU", df["SKU"].nunique())
-    m2.metric("Unidades Sistema", int(df["Sistema"].sum()))
-    m3.metric("Unidades Físico", int(df["Fisico"].sum()))
-    m4.metric("LOST bruto", f"{lost_raw_units} uds")
-    m5.metric("FOUND bruto", f"{found_raw_units} uds")
-    m6.metric("Diferencia neta bruta", f"{diferencia_neta_bruta} uds")
-    m7.metric("Salud inventario", salud, color_salud)
-
-    # GRÁFICO CIRCULAR
-    st.write("---")
-    st.subheader("📊 Distribución de estados del inventario")
-
-    pie_df = pd.DataFrame({
-        "Categoria": ["LOST reales", "FOUND reales", "Reubicados", "Cruces de talla", "OK"],
-        "Unidades": [
-            lost_real_units,
-            found_real_units,
-            reubicados_units,
-            cruces_units,
-            ok_units
-        ]
-    })
-
-    fig_pie = px.pie(
-        pie_df,
-        names="Categoria",
-        values="Unidades",
-        title="Distribución de unidades por tipo de diferencia",
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+    c3.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
 
     # DIFERENCIAS BRUTAS
     st.write("---")
@@ -155,10 +100,7 @@ if archivo:
 
     st.dataframe(resumen_bruto, use_container_width=True)
 
-    # DIFERENCIAS REALES
-    st.write("---")
-    st.subheader("📦 Diferencias por SKU (reales)")
-
+    # DIFERENCIAS REALES (sin cruces aún)
     df_real = df[df["SKU"].isin(sku_diff[sku_diff != 0].index)]
 
     resumen_real = df_real.groupby("SKU").agg(
@@ -169,48 +111,65 @@ if archivo:
         Ubicaciones=("Ubicacion", lambda x: ", ".join(sorted(x.unique())))
     ).reset_index()
 
-    st.dataframe(resumen_real, use_container_width=True)
-
-    # REUBICACIONES
+    # --- CRUCES DE TALLAS (solo si LOST y FOUND compensan) ---
     st.write("---")
-    st.subheader("🔄 Reubicaciones Internas")
+    st.subheader("🏷️ Cruces de Variantes (solo si compensan)")
 
-    reubicaciones = []
-    for sku, grupo in df.groupby("SKU"):
-        if grupo["Ubicacion"].nunique() > 1:
-            reubicaciones.append({
-                "SKU": sku,
-                "Ubicaciones": ", ".join(sorted(grupo["Ubicacion"].unique())),
-                "Total Sistema": grupo["Sistema"].sum(),
-                "Total Físico": grupo["Fisico"].sum()
-            })
+    cruces_final = []
+    restantes_extra = []
 
-    if reubicaciones:
-        st.dataframe(pd.DataFrame(reubicaciones), use_container_width=True)
-    else:
-        st.info("No se detectaron reubicaciones internas.")
-
-    # CRUCES DE TALLAS
-    st.write("---")
-    st.subheader("🏷️ Cruces de Variantes")
-
-    cruces = []
     for (ubic, raiz), grupo in df.groupby(["Ubicacion", "Raiz"]):
-        if grupo["SKU"].nunique() > 1:
-            detalle = ", ".join(
-                f"{row['SKU']} ({row['Fisico']})"
-                for _, row in grupo.iterrows()
-            )
-            cruces.append({
-                "Ubicación": ubic,
-                "Artículo Base": raiz,
-                "Variantes": detalle
-            })
 
-    if cruces:
-        st.dataframe(pd.DataFrame(cruces), use_container_width=True)
+        # Solo si hay varias tallas del mismo modelo
+        if grupo["SKU"].nunique() > 1:
+
+            # Filtrar solo tallas con diferencias
+            grupo_dif = grupo[grupo["Diferencia"] != 0]
+
+            if grupo_dif.empty:
+                continue
+
+            # Compensación LOST/FOUND
+            resto = grupo_dif["Diferencia"].sum()
+
+            if resto == 0:
+                # ES CRUCE → mostrar tallas con diferencias
+                tallas_detalle = ", ".join(
+                    f"{row['SKU']} → Dif {row['Diferencia']}"
+                    for _, row in grupo_dif.iterrows()
+                )
+
+                cruces_final.append({
+                    "Ubicación": ubic,
+                    "Modelo": raiz,
+                    "Tallas involucradas": tallas_detalle
+                })
+
+            else:
+                # NO compensa → añadir restante a diferencias reales
+                restantes_extra.append({
+                    "SKU": f"{raiz}-RESTO",
+                    "Sistema_Total": 0,
+                    "Fisico_Total": 0,
+                    "Diferencia_Total": resto,
+                    "Diferencia_Absoluta": abs(resto),
+                    "Ubicaciones": ubic
+                })
+
+    # Añadir restantes al reporte de diferencias reales
+    if restantes_extra:
+        resumen_real = pd.concat([resumen_real, pd.DataFrame(restantes_extra)], ignore_index=True)
+
+    # Mostrar cruces
+    if cruces_final:
+        st.dataframe(pd.DataFrame(cruces_final), use_container_width=True)
     else:
-        st.info("No se detectaron variantes mezcladas.")
+        st.info("No hay cruces de talla que compensen LOST y FOUND.")
+
+    # Mostrar diferencias reales actualizadas
+    st.write("---")
+    st.subheader("📦 Diferencias por SKU (incluye RESTO por modelo)")
+    st.dataframe(resumen_real, use_container_width=True)
 
     # ZONAS CRÍTICAS
     st.write("---")
@@ -233,12 +192,13 @@ if archivo:
     st.subheader("📋 Reporte Completo")
     st.dataframe(df, use_container_width=True)
 
-    # DESCARGA EN EXCEL (openpyxl)
+    # DESCARGA EN EXCEL
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name="Inventario")
         resumen_bruto.to_excel(writer, index=False, sheet_name="Diferencias Brutas")
         resumen_real.to_excel(writer, index=False, sheet_name="Diferencias Reales")
+        pd.DataFrame(cruces_final).to_excel(writer, index=False, sheet_name="Cruces Compensados")
 
     excel_data = output.getvalue()
 
