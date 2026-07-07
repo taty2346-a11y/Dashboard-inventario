@@ -66,7 +66,7 @@ if archivo:
     ok_units = int(ok_items["Sistema"].sum())
     ok_skus = ok_items["SKU"].nunique()
 
-    # Porcentajes
+    # Porcentajes iniciales
     pct_lost_real = round((lost_real_units / total_unidades) * 100, 2)
     pct_found_real = round((found_real_units / total_unidades) * 100, 2)
     pct_reubicados = round((reubicados_units / total_unidades) * 100, 2)
@@ -87,21 +87,7 @@ if archivo:
         salud = "Crítica — Diferencias significativas"
         color_salud = "🔴"
 
-    # PANEL PORCENTAJES
-    st.write("---")
-    st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
-
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric("LOST reales", f"{pct_lost_real}% | {lost_real_units} uds")
-    c2.metric("FOUND reales", f"{pct_found_real}% | {found_real_units} uds")
-    c3.metric("Reubicados", f"{pct_reubicados}% | {reubicados_units} uds")
-    c4.metric("Cruces de tallas", f"{pct_cruces_talla}% | {cruces_units} uds")
-    c5.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
-
     # DIFERENCIAS BRUTAS
-    st.write("---")
-    st.subheader("📦 Diferencias por SKU (brutas)")
-
     resumen_bruto = df.groupby("SKU").agg(
         Sistema_Total=("Sistema", "sum"),
         Fisico_Total=("Fisico", "sum"),
@@ -110,9 +96,7 @@ if archivo:
         Ubicaciones=("Ubicacion", lambda x: ", ".join(sorted(x.unique())))
     ).reset_index()
 
-    st.dataframe(resumen_bruto, use_container_width=True)
-
-    # DIFERENCIAS REALES (sin cruces ni reubicados aún)
+    # DIFERENCIAS REALES
     df_real = df[df["SKU"].isin(sku_diff[sku_diff != 0].index)]
 
     resumen_real = df_real.groupby("SKU").agg(
@@ -124,9 +108,6 @@ if archivo:
     ).reset_index()
 
     # --- CRUCES Y REUBICADOS (misma lógica) ---
-    st.write("---")
-    st.subheader("🏷️ Cruces y Reubicados (solo si compensan)")
-
     cruces_final = []
     reubicaciones_final = []
     restantes = []  # <-- RESTOS agrupados por modelo
@@ -200,6 +181,30 @@ if archivo:
         df_restantes = pd.DataFrame(restantes)
         resumen_real = pd.concat([resumen_real, df_restantes], ignore_index=True)
 
+    # PANEL PORCENTAJES (SUMANDO RESTOS A LOST/FOUND)
+    st.write("---")
+    st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
+
+    # Calcular LOST y FOUND de los RESTOS
+    lost_restos = sum(r["Diferencia_Total"] for r in restantes if r["Diferencia_Total"] < 0)
+    found_restos = sum(r["Diferencia_Total"] for r in restantes if r["Diferencia_Total"] > 0)
+
+    # LOST y FOUND corregidos
+    lost_real_units_corr = lost_real_units + abs(lost_restos)
+    found_real_units_corr = found_real_units + found_restos
+
+    pct_lost_real_corr = round((lost_real_units_corr / total_unidades) * 100, 2)
+    pct_found_real_corr = round((found_real_units_corr / total_unidades) * 100, 2)
+
+    # Cruces y reubicados NO se corrigen (solo compensados)
+    c1, c2, c3, c4, c5 = st.columns(5)
+
+    c1.metric("LOST reales", f"{pct_lost_real_corr}% | {lost_real_units_corr} uds")
+    c2.metric("FOUND reales", f"{pct_found_real_corr}% | {found_real_units_corr} uds")
+    c3.metric("Reubicados (compensados)", f"{pct_reubicados}% | {reubicados_units} uds")
+    c4.metric("Cruces de talla (compensados)", f"{pct_cruces_talla}% | {cruces_units} uds")
+    c5.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
+
     # Mostrar cruces y reubicados compensados
     if cruces_final or reubicaciones_final:
         st.dataframe(pd.DataFrame(cruces_final + reubicaciones_final), use_container_width=True)
@@ -212,9 +217,6 @@ if archivo:
     st.dataframe(resumen_real, use_container_width=True)
 
     # ZONAS CRÍTICAS
-    st.write("---")
-    st.subheader("🔥 Zonas con Mayor Diferencia")
-
     zonas = df.groupby("Ubicacion")["Dif_Abs"].sum().reset_index()
 
     fig = px.bar(
