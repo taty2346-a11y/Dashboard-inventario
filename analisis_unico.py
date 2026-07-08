@@ -90,9 +90,19 @@ if archivo:
     # PANEL PORCENTAJES
     st.write("---")
     st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
+
+    # Denominador: unidades físicas auditadas
+    total_unidades = df["Fisico"].sum()
+
     # Cálculo del resto
     resto_units = total_unidades - (lost_real_units + found_real_units + cruces_units)
     pct_resto = round((resto_units / total_unidades) * 100, 2)
+    
+    # Porcentajes sobre FÍSICO real
+    pct_lost_real = round((lost_real_units / total_unidades) * 100, 2)
+    pct_found_real = round((found_real_units / total_unidades) * 100, 2)
+    pct_cruces_talla = round((cruces_units / total_unidades) * 100, 2)
+
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("LOST reales", f"{pct_lost_real}% | {lost_real_units} uds")
     c2.metric("FOUND reales", f"{pct_found_real}% | {found_real_units} uds")
