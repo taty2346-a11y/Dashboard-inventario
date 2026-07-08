@@ -58,7 +58,7 @@ if archivo:
     found_real_units = int(sku_diff[sku_diff > 0].sum())
 
     # Unidades informativas
-    resto_units = int(df[(df["Diferencia"] == 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
+    reubicados_units = int(df[df["SKU"].isin(reubicados_skus)]["Dif_Abs"].sum())
     cruces_units = int(df[df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)]["Dif_Abs"].sum())
 
     # SKU sin diferencia
@@ -94,8 +94,8 @@ if archivo:
     # Denominador: unidades físicas auditadas
     total_unidades = df["Fisico"].sum()
 
-    # Cálculo del resto
-    resto_units = total_unidades - (lost_real_units + found_real_units + cruces_units)
+    # RESTO = unidades sin diferencia y que NO son reubicados ni cruces
+    resto_units = int(df[(df["Diferencia"] == 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
     pct_resto = round((resto_units / total_unidades) * 100, 2)
     
     # Porcentajes sobre FÍSICO real
