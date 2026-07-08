@@ -30,7 +30,7 @@ if archivo:
     df["Diferencia"] = df["Fisico"] - df["Sistema"]
     df["Dif_Abs"] = df["Diferencia"].abs()
 
-    total_unidades = df["Sistema"].sum()
+    total_unidades = df["Fisico"].sum()
 
     # Clasificación básica
     df["Estado"] = df["Diferencia"].apply(
@@ -63,7 +63,7 @@ if archivo:
 
     # SKU sin diferencia
     ok_items = df[df["Diferencia"] == 0]
-    ok_units = int(ok_items["Sistema"].sum())
+    ok_units = int(ok_items["Fisico"].sum())
     ok_skus = ok_items["SKU"].nunique()
 
     # Porcentajes
