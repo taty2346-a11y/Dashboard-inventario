@@ -58,7 +58,7 @@ if archivo:
     found_real_units = int(sku_diff[sku_diff > 0].sum())
 
     # Unidades informativas
-    reubicados_units = int(df[df["SKU"].isin(reubicados_skus)]["Dif_Abs"].sum())
+    resto_units = int(df[(df["Diferencia"] == 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
     cruces_units = int(df[df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)]["Dif_Abs"].sum())
 
     # SKU sin diferencia
