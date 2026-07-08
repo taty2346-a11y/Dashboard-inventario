@@ -59,6 +59,13 @@ if archivo:
     mask_reubicados = df["SKU"].isin(reubicados_skus)
     mask_cruces = df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)
 
+    ### 🔥 DEBUG → ver qué está entrando en cada categoría
+    st.write("DEBUG total físico:", df["Fisico"].sum())
+    st.write("DEBUG unidades reubicadas:", df[mask_reubicados]["Fisico"].sum())
+    st.write("DEBUG unidades cruces:", df[mask_cruces]["Fisico"].sum())
+    st.write("DEBUG filas reubicadas:", df[mask_reubicados].shape[0])
+    st.write("DEBUG filas cruces:", df[mask_cruces].shape[0])
+
     lost_real_units = int(df[(df["Diferencia"] < 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
     found_real_units = int(df[(df["Diferencia"] > 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
 
