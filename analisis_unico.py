@@ -102,15 +102,13 @@ if archivo:
     st.write("---")
     st.subheader("📌 Resumen General")
 
-    m1, m2, m3, m4, m5, m6, m7 = st.columns(7)
+    m1, m2, m3, m4, m5 = st.columns(5)
 
     m1.metric("Total SKU", df["SKU"].nunique())
     m2.metric("Unidades Sistema", int(df["Sistema"].sum()))
     m3.metric("Unidades Físico", int(df["Fisico"].sum()))
-    m4.metric("LOST bruto", f"{lost_raw_units} uds")
-    m5.metric("FOUND bruto", f"{found_raw_units} uds")
-    m6.metric("Diferencia neta bruta", f"{diferencia_neta_bruta} uds")
-    m7.metric("Salud inventario", salud, color_salud)
+    m4.metric("Diferencia neta bruta", f"{diferencia_neta_bruta} uds")
+    m5.metric("Salud inventario", salud, color_salud)
 
     # GRÁFICO CIRCULAR
     st.write("---")
