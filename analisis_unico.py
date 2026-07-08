@@ -90,13 +90,14 @@ if archivo:
     # PANEL PORCENTAJES
     st.write("---")
     st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
-
-    c1, c2, c3, c4, c5 = st.columns(5)
+    # Cálculo del resto
+    resto_units = total_unidades - (lost_real_units + found_real_units + cruces_units)
+    pct_resto = round((resto_units / total_unidades) * 100, 2)
+    c1, c2, c3, c4 = st.columns(4)
     c1.metric("LOST reales", f"{pct_lost_real}% | {lost_real_units} uds")
     c2.metric("FOUND reales", f"{pct_found_real}% | {found_real_units} uds")
-    c3.metric("Reubicados", f"{pct_reubicados}% | {reubicados_units} uds")
-    c4.metric("Cruces de tallas", f"{pct_cruces_talla}% | {cruces_units} uds")
-    c5.metric("SKU sin diferencia", f"{pct_ok_units}% | {ok_units} uds", f"{ok_skus} SKU")
+    c3.metric("Cruces de tallas", f"{pct_cruces_talla}% | {cruces_units} uds")
+    c4.metric("Resto", f"{pct_resto}% | {resto_units} uds")
 
     # RESUMEN GENERAL
     st.write("---")
