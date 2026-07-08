@@ -30,8 +30,7 @@ if archivo:
     df["Diferencia"] = df["Fisico"] - df["Sistema"]
     df["Dif_Abs"] = df["Diferencia"].abs()
 
-    ### 🔥 CAMBIO 1 → denominador correcto: unidades auditadas reales
-    total_unidades = df["Fisico"].sum()
+    total_unidades = df["Sistema"].sum()
 
     # Clasificación básica
     df["Estado"] = df["Diferencia"].apply(
@@ -55,32 +54,19 @@ if archivo:
     # --- DIFERENCIAS REALES POR SKU ---
     sku_diff = df.groupby("SKU")["Diferencia"].sum()
 
-    ### 🔥 CAMBIO 2 → categorías exclusivas
-    mask_reubicados = df["SKU"].isin(reubicados_skus)
-    mask_cruces = df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)
+    lost_real_units = int(sku_diff[sku_diff < 0].abs().sum())
+    found_real_units = int(sku_diff[sku_diff > 0].sum())
 
-    ### 🔥 DEBUG → ver qué está entrando en cada categoría
-    st.write("DEBUG total físico:", df["Fisico"].sum())
-    st.write("DEBUG unidades reubicadas:", df[mask_reubicados]["Fisico"].sum())
-    st.write("DEBUG unidades cruces:", df[mask_cruces]["Fisico"].sum())
-    st.write("DEBUG filas reubicadas:", df[mask_reubicados].shape[0])
-    st.write("DEBUG filas cruces:", df[mask_cruces].shape[0])
-
-    lost_real_units = int(df[(df["Diferencia"] < 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
-    found_real_units = int(df[(df["Diferencia"] > 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
-
-    ### 🔥 CAMBIO 3 → reubicados y cruces sobre FÍSICO, no Dif_Abs
-    reubicados_units = int(df[mask_reubicados]["Fisico"].sum())
-    cruces_units = int(df[mask_cruces]["Fisico"].sum())
+    # Unidades informativas
+    reubicados_units = int(df[df["SKU"].isin(reubicados_skus)]["Dif_Abs"].sum())
+    cruces_units = int(df[df.set_index(["Ubicacion", "Raiz"]).index.isin(cruces_index)]["Dif_Abs"].sum())
 
     # SKU sin diferencia
     ok_items = df[df["Diferencia"] == 0]
+    ok_units = int(ok_items["Sistema"].sum())
+    ok_skus = ok_items["SKU"].nunique()
 
-    ### 🔥 CAMBIO 4 → OK sobre FÍSICO y exclusivo
-    ok_units = int(ok_items[~mask_reubicados & ~mask_cruces]["Fisico"].sum())
-    ok_skus = ok_items[~mask_reubicados & ~mask_cruces]["SKU"].nunique()
-
-    # Porcentajes EXCLUSIVOS
+    # Porcentajes
     pct_lost_real = round((lost_real_units / total_unidades) * 100, 2)
     pct_found_real = round((found_real_units / total_unidades) * 100, 2)
     pct_reubicados = round((reubicados_units / total_unidades) * 100, 2)
@@ -103,7 +89,7 @@ if archivo:
 
     # PANEL PORCENTAJES
     st.write("---")
-    st.subheader("📊 Porcentajes Globales del Inventario (categorías exclusivas)")
+    st.subheader("📊 Porcentajes Globales del Inventario (unidades reales)")
 
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric("LOST reales", f"{pct_lost_real}% | {lost_real_units} uds")
@@ -126,9 +112,9 @@ if archivo:
     m6.metric("Diferencia neta bruta", f"{diferencia_neta_bruta} uds")
     m7.metric("Salud inventario", salud, color_salud)
 
-    # GRÁFICO CIRCULAR EXCLUSIVO
+    # GRÁFICO CIRCULAR
     st.write("---")
-    st.subheader("📊 Distribución de estados del inventario (exclusivo)")
+    st.subheader("📊 Distribución de estados del inventario")
 
     pie_df = pd.DataFrame({
         "Categoria": ["LOST reales", "FOUND reales", "Reubicados", "Cruces de talla", "OK"],
@@ -163,12 +149,11 @@ if archivo:
 
     st.dataframe(resumen_bruto, use_container_width=True)
 
-    # DIFERENCIAS REALES (EXCLUSIVAS)
+    # DIFERENCIAS REALES
     st.write("---")
-    st.subheader("📦 Diferencias por SKU (reales, exclusivas)")
+    st.subheader("📦 Diferencias por SKU (reales)")
 
-    ### 🔥 CAMBIO 5 → excluir reubicados y cruces
-    df_real = df[df["SKU"].isin(sku_diff[sku_diff != 0].index) & ~mask_reubicados & ~mask_cruces]
+    df_real = df[df["SKU"].isin(sku_diff[sku_diff != 0].index)]
 
     resumen_real = df_real.groupby("SKU").agg(
         Sistema_Total=("Sistema", "sum"),
