@@ -94,8 +94,8 @@ if archivo:
     # Denominador: unidades físicas auditadas
     total_unidades = df["Fisico"].sum()
 
-    # Cálculo del resto
-    resto_units = total_unidades - (lost_real_units + found_real_units + cruces_units)
+    # RESTO = unidades sin diferencia y que NO son reubicados ni cruces
+    resto_units = int(df[(df["Diferencia"] == 0) & ~mask_reubicados & ~mask_cruces]["Fisico"].sum())
     pct_resto = round((resto_units / total_unidades) * 100, 2)
     
     # Porcentajes sobre FÍSICO real
